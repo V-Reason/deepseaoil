@@ -185,7 +185,13 @@ namespace DeepseaOil.Presentation
 
             if (!logic.TakeDamage(in damage, now)) return;
 
-            if (!logic.IsAlive) _retryAt = now + spec.RetryDelay;
+            if (!logic.IsAlive)
+            {
+                _retryAt = now + spec.RetryDelay;
+
+                // 只报事实，怎么播由玩家侧翻译（表现细节不外泄到世界侧）
+                player.OnDeathTriggered();
+            }
         }
 
         public void ClearAll()

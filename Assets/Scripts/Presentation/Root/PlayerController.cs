@@ -29,6 +29,9 @@ namespace DeepseaOil.Presentation
         [Tooltip("地图活动区域：拖入覆盖可行走区域的 BoxCollider2D。不接则不钳位（不报错，调试面板会显示未接线）")]
         [SerializeField] private BoxCollider2D boundsArea = default;
 
+        [Tooltip("视觉适配器，必须挂在子节点 View 上（Root 只放物理与逻辑）。留空则 Awake 自愈：先找子节点，找不到就地造一个 View")]
+        [SerializeField] private ActorAnimationView animView = default;
+
         /// <summary>方向判零容差，吸收摇杆漂移与浮点残渣</summary>
         private const float DirectionEpsilon = 1e-6f;
 
@@ -50,7 +53,8 @@ namespace DeepseaOil.Presentation
         /// <summary>瞄准平面深度，世界单位，Attach 取一次</summary>
         private float _cameraPlaneDepth = 100f;
 
-        private SpriteRenderer _body;
+        /// <summary>视觉适配器，挂在子节点 View 上；Root 只承担物理真值与组合根</summary>
+        private ActorAnimationView _animView;
 
         private Vector2 _spawnPoint;
 
@@ -60,6 +64,10 @@ namespace DeepseaOil.Presentation
 
         /// <summary>碰撞用物理体位置，不是 transform</summary>
         public Vector2 Position => motor == null ? Vector2.zero : motor.Position;
+
+        /// <summary>视觉适配器（挂在子节点 View 上）；白模期可能整类空转，外部调用一律判空</summary>
+        public ActorAnimationView Visual => _animView;
+
         public WorldInfo World => _world;
 
         /// <summary>引擎回读速度，滞后一个物理步，用于与逻辑层对照</summary>
@@ -106,6 +114,47 @@ namespace DeepseaOil.Presentation
             if (_bounds.TryClamp(position, out Vector2 clamped)) position = clamped;
 
             Logic.RespawnTo(position);
+
+            // 死亡触发器未必已被消费，不清会在复活瞬间补播一次倒地
+            _animView?.ResetToDefault();
+        }
+
+        /// <summary>已死、进入重生等待：由世界侧裁决出死亡时调</summary>
+        public void OnDeathTriggered()
+        {
+            _animView?.TriggerDie();
+        }
+
+        /// <summary>自愈装配视觉子节点：先找子节点 View，找不到就地造一个</summary>
+        /// <remarks>兜底造出来的 View 照抄 Root 上渲染器的 sprite/颜色/排序层，老预制体自愈后视觉不跳变。Sprite 与颜色不在这里配：那属各场景观感。</remarks>
+        private void EnsureAnimationView()
+        {
+            if (animView == null) animView = GetComponentInChildren<ActorAnimationView>(true);
+
+            if (animView == null)
+            {
+                var view = new GameObject("View");
+
+                view.transform.SetParent(transform, false);
+
+                var sprite = view.AddComponent<SpriteRenderer>();
+
+                // 老拓扑的渲染器在 Root 上：参数照搬，免得自愈之后玩家变白块
+                var legacy = GetComponent<SpriteRenderer>();
+
+                if (legacy != null)
+                {
+                    sprite.sprite = legacy.sprite;
+                    sprite.color = legacy.color;
+                    sprite.sortingLayerID = legacy.sortingLayerID;
+                    sprite.sortingOrder = legacy.sortingOrder;
+                }
+
+                animView = view.AddComponent<ActorAnimationView>();
+            }
+
+            // 两个字段各司其职：animView 是序列化接线（Inspector 可见），_animView 是运行期缓存（热路径零判断）
+            _animView = animView;
         }
 
         private void Awake()
@@ -117,6 +166,8 @@ namespace DeepseaOil.Presentation
                 enabled = false;
                 return;
             }
+
+            EnsureAnimationView();
 
             _bounds = ReadBounds();
             _world = new WorldInfo(Vector2.zero, in _bounds); // 首帧前也不留 default
@@ -203,6 +254,9 @@ namespace DeepseaOil.Presentation
             // 遮挡属观感与物理步无关；放暂停判断之前，暂停时也要保持档位正确。
             UpdateSortingOrder();
 
+            // 运动学快照每渲染帧推一次（含暂停帧）：插值出来的位置比物理帧平滑，动画不该跟着 50Hz 跳。
+            _animView?.SetMotion(_world.MoveDirection, Logic.Motor.Facing, EngineVelocity.magnitude);
+
             if (inputProvider == null || !inputProvider.IsInputEnabled)
             {
                 Logic.ClearAim();
@@ -218,18 +272,27 @@ namespace DeepseaOil.Presentation
             Logic.UpdateAim(AimWorldPoint(camera), now);
 
             // 动作表无攻击动作：由 InputProvider 直读指针产出。主攻击=水球（耗弹药），副攻击=土球（不耗）。
-            if (inputProvider.AttackPressedThisFrame) Logic.RequestThrow(BallType.Water, now);
-            if (inputProvider.AltAttackPressedThisFrame) Logic.RequestThrow(BallType.Earth, now);
+            // 只有世界侧采纳了才播出手动作：否则空放/射程外也会抬手。
+            if (inputProvider.AttackPressedThisFrame && Logic.RequestThrow(BallType.Water, now))
+            {
+                _animView?.Trigger(PlayerAnimHashes.TriggerThrow);
+            }
+
+            if (inputProvider.AltAttackPressedThisFrame && Logic.RequestThrow(BallType.Earth, now))
+            {
+                _animView?.Trigger(PlayerAnimHashes.TriggerThrow);
+            }
         }
 
         /// <summary>按 y 刷新本体渲染档位，场景里填的 sortingOrder 只是初始值</summary>
+        /// <remarks>基准取 Root 的物理体 y 而非 View 的 transform y：View 的 localPosition 会被受击抖动/伪高度改写，拿它排序会让角色随特效上下乱插队。</remarks>
         private void UpdateSortingOrder()
         {
-            if (_body == null) _body = GetComponent<SpriteRenderer>();
+            SpriteRenderer body = _animView != null ? _animView.Renderer : null;
 
-            if (_body == null) return;
+            if (body == null) return;
 
-            _body.sortingOrder = RenderOrder.ActorOrder(Position.y);
+            body.sortingOrder = RenderOrder.ActorOrder(Position.y);
         }
 
         /// <summary>屏幕点→世界点；不读相机 z，它被 Cinemachine 每帧驱动，正交相机下用足够大的常量深度更稳，见 ThrowTuning.cameraPlaneDepth</summary>

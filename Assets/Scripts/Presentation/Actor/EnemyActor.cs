@@ -27,7 +27,10 @@ namespace DeepseaOil.Presentation.Actor
         private EnemySpec _spec;
         private EnemyLogic _logic;
         private EnemyMotor _motor;
-        private SpriteRenderer _body;
+
+        /// <summary>视觉适配器，挂在子节点 View 上；Root 只承担物理真值与组合根</summary>
+        private ActorAnimationView _animView;
+
         private TextMesh _hpText;
         private Transform _target;
         private GridLogic _grid;
@@ -112,9 +115,13 @@ namespace DeepseaOil.Presentation.Actor
 
             if (!Stats.IsAlive)
             {
+                _animView?.TriggerDie();
+
                 Die(damage.Direction);
                 return;
             }
+
+            _animView?.TriggerHurt();
 
             UpdateHpText();
         }
@@ -132,6 +139,9 @@ namespace DeepseaOil.Presentation.Actor
             UpdateCell(force: false);
             UpdateBodyColor();
             UpdateSortingOrder();
+
+            // 运动学快照与移动同频提交：动画的朝向/速度与物理体必须看到同一帧的真值
+            _animView?.SetMotion(EngineVelocity, _motor.Facing, EngineVelocity.magnitude);
         }
 
         public void ApplySlow(float speedScale, float seconds)
@@ -184,16 +194,24 @@ namespace DeepseaOil.Presentation.Actor
             collider.radius = _spec.Radius;
         }
 
+        /// <summary>建视觉子节点 View：Root 只留物理与逻辑，抖动/后坐力/伪高度将来只改 View 的 localPosition</summary>
+        /// <remarks>HpText 仍挂在 Root 下：数字不该跟着 View 抖，且它的 y 就是物理体中心。</remarks>
         private void BuildVisuals()
         {
-            _body = gameObject.AddComponent<SpriteRenderer>();
+            var view = new GameObject("View");
+
+            view.transform.SetParent(transform, false);
+
+            SpriteRenderer body = view.AddComponent<SpriteRenderer>();
 
             PrimitiveSprites.Configure(
-                _body,
+                body,
                 PrimitiveSprites.Circle,
                 ConfigModule.Visuals.enemyBodyNormal,
                 RenderOrder.ActorOrder(Position.y),
                 _spec.Radius * 2f);
+
+            _animView = view.AddComponent<ActorAnimationView>();
 
             BuildHpText();
             UpdateHpText();
@@ -280,18 +298,23 @@ namespace DeepseaOil.Presentation.Actor
         /// <remarks>闪白相位用 Time.time 而非累加（累加会随帧率漂）；EffectId.Flash 驱动未实现，故每帧刷 color。</remarks>
         private void UpdateBodyColor()
         {
-            if (_body == null) return;
+            SpriteRenderer body = _animView != null ? _animView.Renderer : null;
+
+            if (body == null) return;
 
             bool flashOn = IsHurt && IsFlashOn(Time.time, _spec.FlashHz);
 
-            _body.color = ConfigModule.Visuals.EnemyBodyColor(_slowMultiplier, flashOn);
+            body.color = ConfigModule.Visuals.EnemyBodyColor(_slowMultiplier, flashOn);
         }
 
+        /// <remarks>基准取 Root 的物理体 y 而非 View 的 transform y：View 的 localPosition 会被特效改写，拿它排序会让敌人随抖动乱插队。</remarks>
         private void UpdateSortingOrder()
         {
-            if (_body == null) return;
+            SpriteRenderer body = _animView != null ? _animView.Renderer : null;
 
-            _body.sortingOrder = RenderOrder.ActorOrder(Position.y);
+            if (body == null) return;
+
+            body.sortingOrder = RenderOrder.ActorOrder(Position.y);
         }
 
         private void UpdateCell(bool force)
