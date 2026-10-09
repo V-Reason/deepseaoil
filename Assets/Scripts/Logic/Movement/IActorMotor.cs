@@ -30,12 +30,6 @@ namespace DeepseaOil.Logic.Movement
         void AddForce(Vector2 acceleration);
 
         void SetVelocity(Vector2 velocity);
-
-        /// <summary>速度硬钳到上限；上限 ≤0 不限制</summary>
-        void ClampSpeed(float maxSpeed);
-
-        /// <summary>缩放外力累加强度，俯视角角色填 0</summary>
-        void SetExtraForceScale(float scale);
     }
 
     /// <summary>角色移动执行器完整契约：写物理体（IMovementMotor）＋ 控制律与账本（IStateHost ＋ IActorLedger）。只接受配置、不暴露配置</summary>

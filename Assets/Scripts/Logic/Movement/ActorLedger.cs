@@ -13,7 +13,6 @@ namespace DeepseaOil.Logic.Movement
         private Vector2 _delta;
         private Vector2 _accel;
         private float _speedScale = 1f;
-        private float _extraForceScale = 1f;
         private float _now;
         private float _dt = 0.02f;
 
@@ -108,23 +107,6 @@ namespace DeepseaOil.Logic.Movement
             SetVelocityX(velocity.x);
             _accel.y = 0f;
             _delta.y = velocity.y - _frameStart.y;
-        }
-
-        public void ClampSpeed(float maxSpeed)
-        {
-            if (maxSpeed <= 0f) return;
-
-            SetVelocity(Vector2.ClampMagnitude(Velocity, maxSpeed));
-        }
-
-        public void SetExtraForceScale(float scale) => _extraForceScale = scale;
-
-        /// <summary>提交一帧外力，force 单位/秒²，按 Δt 与强度缩放累进账本，零向量表示无外力；没有生产消费者，刻意保留</summary>
-        public void ApplyExtraForce(Vector2 force)
-        {
-            if (force.sqrMagnitude <= 0f || _extraForceScale == 0f) return;
-
-            AddForce(force * _extraForceScale);
         }
 
         public void MoveDirection(Vector2 direction, float speed)

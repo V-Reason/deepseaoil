@@ -22,23 +22,9 @@ namespace DeepseaOil.Logic.Player
 
         public PlayerSpec Spec => _spec;
 
-        public float Maximum => _spec.MaxHp;
-
-        public float Current => _current;
-
         public int WaterBallCount { get; private set; }
 
         public bool IsAlive => _current > 0f;
-
-        public bool IsInvulnerable(float now)
-        {
-            return !CanTakeDamage(now, _invulnerableUntil);
-        }
-
-        public float InvulnerableRemaining(float now)
-        {
-            return Mathf.Max(0f, _invulnerableUntil - now);
-        }
 
         /// <remarks>必须写成 !(now &lt; invulnerableUntil)：否则 NaN 时永久无敌且看不出来</remarks>
         public static bool CanTakeDamage(float now, float invulnerableUntil)
@@ -92,14 +78,6 @@ namespace DeepseaOil.Logic.Player
             EventBus<WaterBallCountChanged>.Publish(new WaterBallCountChanged(WaterBallCount));
 
             return true;
-        }
-
-        /// <summary>水球清零，血量不在此重置</summary>
-        public void ResetWater()
-        {
-            WaterBallCount = 0;
-
-            EventBus<WaterBallCountChanged>.Publish(new WaterBallCountChanged(WaterBallCount));
         }
 
         public void Announce()

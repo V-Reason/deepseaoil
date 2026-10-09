@@ -47,7 +47,7 @@ namespace DeepseaOil.Data
             _cache      = new CacheStore();
             _refCounter = new RefCounter(_cache, COOLDOWN_SECONDS);
             _scheduler  = new LoadScheduler(_registry, MAX_CONCURRENT_LOAD);
-            _lifecycle  = new LifecycleMgr(_cache, COOLDOWN_SECONDS, MAX_CACHE_ENTRIES, MAX_EVICT_PER_TICK);
+            _lifecycle  = new LifecycleMgr(_cache, MAX_CACHE_ENTRIES, MAX_EVICT_PER_TICK);
             _failure    = new FailureHandler();
 
             _pendingLoads.Clear();

@@ -15,7 +15,7 @@ namespace DeepseaOil.Presentation.UI
         System,
     }
 
-    /// <summary>管理所有 UI 面板，普通类由 GameRoot 持有，异步加载靠 MonoMgr 这个协程宿主</summary>
+    /// <summary>管理所有 UI 面板，普通类由 GameRoot 持有，异步加载的协程也由 GameRoot 托管</summary>
     /// <remarks>面板预设体名必须与类名一致。三件套的创建在 Init，唯一调用点是 GameRoot。</remarks>
     public class UIMgr : IUIOperation
     {
@@ -228,8 +228,8 @@ namespace DeepseaOil.Presentation.UI
 
             panelDic.Add(panelName, new PanelInfo<T>(this, callBack));
 
-            //MonoMgr 是全工程唯一的协程宿主，UIMgr 不是 MonoBehaviour
-            MonoMgr.Instance.StartCoroutine(CoLoadPanel<T>(panelName));
+            // GameRoot 是全工程唯一常驻 MonoBehaviour（DontDestroyOnLoad），UIMgr 不是 MonoBehaviour，协程由它托管
+            GameRoot.Instance.StartCoroutine(CoLoadPanel<T>(panelName));
         }
 
         /// <remarks>轮询而非 await：await 续体会在 AssetModule.Tick 分发循环里重入 UIMgr</remarks>

@@ -146,12 +146,6 @@ namespace DeepseaOil.Tests
 
         public void SetVelocity(Vector2 velocity) => _ledger.SetVelocity(velocity);
 
-        public void ClampSpeed(float maxSpeed) => _ledger.ClampSpeed(maxSpeed);
-
-        public void SetExtraForceScale(float scale) => _ledger.SetExtraForceScale(scale);
-
-        public void ApplyExtraForce(Vector2 force) => _ledger.ApplyExtraForce(force);
-
         // ── 控制律 ──
 
         public void SnapVelocity(Vector2 velocity)

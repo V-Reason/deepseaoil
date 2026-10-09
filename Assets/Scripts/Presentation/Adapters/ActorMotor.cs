@@ -113,10 +113,6 @@ namespace DeepseaOil.Presentation.Adapters
 
         public void SetVelocity(Vector2 velocity) => Ledger.SetVelocity(velocity);
 
-        public void ClampSpeed(float maxSpeed) => Ledger.ClampSpeed(maxSpeed);
-
-        public void SetExtraForceScale(float scale) => Ledger.SetExtraForceScale(scale);
-
         public void SnapVelocity(Vector2 velocity)
         {
             Ledger.SnapVelocity(velocity, v => FaceTowards(new Vector2(v.x, 0f)));
@@ -152,9 +148,6 @@ namespace DeepseaOil.Presentation.Adapters
 
             Facing = direction;
         }
-
-        /// <summary>提交一帧外力并转发给账本；无生产消费者，但有测试语义</summary>
-        public void ApplyExtraForce(Vector2 force) => Ledger.ApplyExtraForce(force);
 
         protected virtual void Awake()
         {

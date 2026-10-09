@@ -72,12 +72,6 @@ namespace DeepseaOil.Logic.Service {
             SetPaused(false);
         }
 
-        public void Reset()
-        {
-            SetPaused(false);
-            pausedTime = 0f;
-        }
-
         public void Dispose()
         {
             gameTime.SetTimeScale(1f);

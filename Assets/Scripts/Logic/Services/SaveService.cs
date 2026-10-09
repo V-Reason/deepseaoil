@@ -11,8 +11,6 @@ namespace DeepseaOil.Logic.Service
 
     public class SaveService : IService
     {
-        private GameData _data;
-
         public SaveService()
         {
         }
@@ -33,7 +31,7 @@ namespace DeepseaOil.Logic.Service
 
         public GameData Load()
         {
-            return _data;
+            return default;
         }
 
         public void Dispose()

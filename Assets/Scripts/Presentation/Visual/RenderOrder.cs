@@ -4,10 +4,6 @@ namespace DeepseaOil.Presentation.Visual
 {
     public static class RenderOrder
     {
-        public const int Ground = 100;
-
-        public const int TileEffect = 300;
-
         /// <summary>贴地件固定层（310），不参与 Y-Sort</summary>
         public const int GroundShadow = 310;
 
@@ -20,9 +16,6 @@ namespace DeepseaOil.Presentation.Visual
 
         /// <summary>每世界单位档数，改它须同步 YSort 频带</summary>
         public const float YSortLevelsPerUnit = 4f;
-
-        /// <summary>须高于频带上沿</summary>
-        public const int ActorOverlay = 560;
 
         public const int ShatterPiece = 1200;
 

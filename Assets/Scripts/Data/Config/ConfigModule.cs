@@ -301,7 +301,7 @@ namespace DeepseaOil.Data
         // 边界：只读；调用方不得跨帧持有该引用；新增消费必须登记在本注释里
 
         /// <summary>原始生成表（cfg.Tables），只给诊断用，正常取值一律走上面的 GetXxx</summary>
-        /// <remarks>登记在案的破例只有 Presentation/Diagnostics/ConfigLoader.cs：它只遍历表对象数行数、不读列。新增破例必须先登记在这里</remarks>
+        /// <remarks>当前无登记破例（原 Presentation/Diagnostics/ConfigLoader.cs 已随死代码清理删除）。新增破例必须先登记在这里</remarks>
         public static cfg.Tables Tables
         {
             get

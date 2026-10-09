@@ -9,8 +9,6 @@ namespace DeepseaOil.Logic.Combat
     // 已死目标不算接触（同 GridLogic.Deal）。
     public static class ContactProbe
     {
-        public const int ScannedCells = 9;
-
         // cellBuffer 复用缓冲（先清空）；contactRadius 世界单位，非法值按 0。
         public static bool TryFindAttacker(
             Vector3Int playerCell,

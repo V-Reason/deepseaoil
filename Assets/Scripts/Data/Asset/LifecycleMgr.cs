@@ -9,17 +9,15 @@ namespace DeepseaOil.Data
     internal sealed class LifecycleMgr
     {
         private readonly CacheStore _cache;
-        private readonly float _cooldownSeconds;
         private readonly int _maxEntries;
         private readonly int _maxEvictPerTick;
         private int _evictedCount;
 
         public int EvictedCount => _evictedCount;
 
-        public LifecycleMgr(CacheStore cache, float cooldownSeconds, int maxEntries, int maxEvictPerTick)
+        public LifecycleMgr(CacheStore cache, int maxEntries, int maxEvictPerTick)
         {
             _cache = cache;
-            _cooldownSeconds = cooldownSeconds;
             _maxEntries = maxEntries;
             _maxEvictPerTick = maxEvictPerTick;
         }

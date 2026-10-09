@@ -12,8 +12,6 @@ namespace DeepseaOil.Logic.Grid
 
         public IReadOnlyList<Vector3Int> Current => _current;
 
-        public int Count => _current.Count;
-
         public void Schedule(Vector3Int cell)
         {
             if (_dedup.Add(cell)) _next.Add(cell);
@@ -23,13 +21,6 @@ namespace DeepseaOil.Logic.Grid
         {
             (_current, _next) = (_next, _current);
 
-            _next.Clear();
-            _dedup.Clear();
-        }
-
-        public void Clear()
-        {
-            _current.Clear();
             _next.Clear();
             _dedup.Clear();
         }

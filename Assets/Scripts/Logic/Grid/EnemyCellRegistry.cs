@@ -11,8 +11,6 @@ namespace DeepseaOil.Logic.Grid
         private readonly Dictionary<Vector3Int, List<IEffectTarget>> _byCell = new();
         private readonly Dictionary<IEffectTarget, Vector3Int> _cellOf = new();
 
-        public int Count => _cellOf.Count;
-
         /// <summary>登记一个目标到某格，已在别处登记时先摘掉旧登记</summary>
         public void Register(Vector3Int cell, IEffectTarget target)
         {
@@ -59,12 +57,6 @@ namespace DeepseaOil.Logic.Grid
         public bool TryGetIn(Vector3Int cell, out List<IEffectTarget> targets)
         {
             return _byCell.TryGetValue(cell, out targets);
-        }
-
-        public void Clear()
-        {
-            _byCell.Clear();
-            _cellOf.Clear();
         }
 
         private void Detach(IEffectTarget target, Vector3Int cell)
