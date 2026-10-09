@@ -1,0 +1,15 @@
+##var	id	name	type	temp	wet	conductive	tags
+##type	BallType	string!	ElementType	"int#range=[-6,6]"	"int#range=[0,6]"	int	ElementTag
+##group	c	c	c	c	c	c	c
+##comment	球种ID	显示名	类型	温度(-6~6)	湿度(0~6)	"导电(0无,1中,2强)"	"标签(含土,含沙,含植物)"
+	纯水	纯水	水	0	3	1	无
+	热水	热水	水	3	3	1	无
+	冷水	冷水	水	-2	3	1	无
+	干土	干土	土	0	0	0	含土
+	湿土	湿土	土	0	2	1	含土
+	沙	沙	土	1	0	0	含沙
+	粘土	粘土	土	0	0	0	含土
+	冰种子	冰种子	地形种子	-4	1	0	无
+	火种子	火种子	地形种子	4	0	0	无
+	植物种子	植物种子	地形种子	0	2	0	含植物
+	电种子	电种子	地形种子	1	0	2	无

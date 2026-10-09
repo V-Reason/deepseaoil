@@ -1,0 +1,5 @@
+##var	id	name	max_speed	hp
+##type	int	string!	"float!#range=[0,50]"	"int!#range=[1,999]"
+##group	c	c	c	c
+##comment	编号	显示名	追击满速	耐久
+	1	白模敌人	3.6	3

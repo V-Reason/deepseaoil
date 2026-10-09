@@ -1,0 +1,23 @@
+##var	id	cell_x	cell_y	state_id
+##type	int	int!	int!	TileStateType
+##group	c	c	c	c
+##comment	编号	格子 x	格子 y	初始状态
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				

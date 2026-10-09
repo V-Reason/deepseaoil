@@ -1,0 +1,5 @@
+##var	id	name	max_hp	contact_damage	invulnerable_duration	retry_delay	attack_interval	knockback_impulse	knockback_speed_limit	contact_radius
+##type	int	string!	"float!#range=[1,99999]"	"float!#range=[0,9999]"	"float!#range=[0,10]"	"float!#range=[0,60]"	"float!#range=[0.01,10]"	"float!#range=[0,100]"	"float!#range=[0,100]"	"float!#range=[0.05,10]"
+##group	c	c	c	c	c	c	c	c	c	c
+##comment	编号	显示名	血量上限	敌人贴身一次造成的伤害	受击无敌时长	打空后重来延时	攻击间隔	受击被推开的冲量	受击期间的速度上限	敌人贴身判定的圆心距（世界单位）
+	1	玩家	3	1	0.8	1.2	0.5	12	12	1
