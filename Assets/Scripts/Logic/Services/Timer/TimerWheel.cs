@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace DeepseaOil.Logic.Services.Time
@@ -196,9 +196,6 @@ namespace DeepseaOil.Logic.Services.Time
             }
         }
 
-        /// <summary>
-        /// 执行 Timer。
-        /// </summary>
         private void Execute(TimerNode node)
         {
             if (node.Cancelled)

@@ -7,8 +7,9 @@ using UnityEngine;
 
 namespace DeepseaOil.Presentation.Actor
 {
-    /// <summary>战斗调度：按波次生成敌人、逐只驱动、清场</summary>
-    /// <remarks>敌人组合根；世界信息全经 Initialize 注入，计时与分支交给 WaveLogic。不挂 FixedUpdate，由组合根每物理帧调 FixedTick。存活数与波次唯一权威：HUD 读的 WaveChanged 由此发布。</remarks>
+    /// 战斗调度：按波次生成敌人、逐只驱动、清场
+    /// 世界信息全经 Initialize 注入；不挂 FixedUpdate，由组合根每物理帧调 FixedTick。存活数与波次唯一权威：HUD 读的 WaveChanged 由此发布。
+    /// 生成用预制体缺件即硬错误：取消生成，不做白模兜底。
     public sealed class CombatDirector : MonoBehaviour
     {
         private WaveLogic _logic;
@@ -26,7 +27,7 @@ namespace DeepseaOil.Presentation.Actor
 
         public int AliveCount { get; private set; }
 
-        /// <summary>列表里第一只存活敌人离玩家多远；无敌人时 -1</summary>
+        /// 列表里第一只存活敌人离玩家多远；无敌人时 -1
         public float FirstAliveEnemyDistance { get; private set; } = -1f;
 
         public Vector2 FirstAliveEnemyVelocity { get; private set; }
@@ -57,7 +58,7 @@ namespace DeepseaOil.Presentation.Actor
             PublishIfChanged();
         }
 
-        /// <summary>清空全场敌人并停当前波次：不清则玩家复活立刻被原地敌人再打一次</summary>
+        /// 清空全场敌人并停当前波次：不清则玩家复活立刻被原地敌人再打一次
         public void ClearAll()
         {
             for (int i = 0; i < _enemies.Count; i++)
@@ -79,8 +80,8 @@ namespace DeepseaOil.Presentation.Actor
             Debug.Log("[Combat] 敌人清场，等待下一波");
         }
 
-        /// <summary>推进一个物理帧：驱动敌人→刷读数→跑波次</summary>
-        /// <remarks>暂停时 timeScale 与 deltaTime 均 0；恢复那帧不补暂停期间欠的生成量</remarks>
+        /// 推进一个物理帧：驱动敌人→刷读数→跑波次
+        /// 暂停时 timeScale 与 deltaTime 均 0；恢复那帧不补暂停期间欠的生成量
         public void FixedTick(float now, float deltaTime)
         {
             if (_logic == null || _player == null) return;
@@ -109,8 +110,8 @@ namespace DeepseaOil.Presentation.Actor
             PublishIfChanged();
         }
 
-        /// <summary>按请求实例化一只敌人；预制体缺件是硬错误，当场取消本次生成，不做白模兜底</summary>
-        /// <remarks>寻址约定与地块贴图同构：种类 id → enemies/Enemy_{id}（见 Docs/美术装配指南.md）。</remarks>
+        /// 按请求实例化一只敌人；预制体缺件是硬错误，当场取消本次生成，不做白模兜底
+        /// 寻址约定与地块贴图同构：种类 id → enemies/Enemy_{id}（见 Docs/美术装配指南.md）。
         private void SpawnOne(in WaveLogic.SpawnRequest request)
         {
             string prefabKey = $"enemies/Enemy_{_enemySpec.Id}";
@@ -150,6 +151,7 @@ namespace DeepseaOil.Presentation.Actor
         private void ClearDestroyed()
         {
             // 倒序删：正序会跳过紧挨的下一个元素，漏删不报错、表现为列表变长。
+            // 倒序删：正序会跳过紧挨的下一个元素，漏删不报错、表现为列表变长。
             for (int i = _enemies.Count - 1; i >= 0; i--)
             {
                 if (_enemies[i] == null) _enemies.RemoveAt(i);
@@ -188,7 +190,7 @@ namespace DeepseaOil.Presentation.Actor
             }
         }
 
-        /// <summary>只在波次或存活数真的变了时发布，免每帧刷事件</summary>
+        /// 只在波次或存活数真的变了时发布，免每帧刷事件
         private void PublishIfChanged()
         {
             int wave = _logic != null ? _logic.WaveIndex : 0;

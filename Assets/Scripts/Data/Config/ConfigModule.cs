@@ -106,7 +106,7 @@ namespace DeepseaOil.Data
             _dropTuning = DropTuning.LoadOrDefault();
             _visuals = VisualPalette.LoadOrDefault();
 
-            // 敌人运动学参数只在这份 SO 里，表里已不再存：缺了没有"字段默认值"可退（那会静默改变手感），当场炸
+            // enemy 表已不存这些值：缺了没有字段默认值可退，会静默改变手感，故当场抛
             _enemyTuning = AssetModule.Load<EnemyTuning>(EnemyTuning.ResourceKey);
 
             if (_enemyTuning == null)
@@ -244,7 +244,7 @@ namespace DeepseaOil.Data
             return _elementRules;
         }
 
-        /// <summary>读一个敌人种类：耐久来自 enemy 表，运动学与半径来自 <see cref="EnemyTuning"/></summary>
+        /// <summary>读一个敌人种类：耐久来自 enemy 表，运动学与半径来自 EnemyTuning</summary>
         public static EnemySpec GetEnemy(int id = Ids.Enemy)
         {
             EnsureAssets();
@@ -282,7 +282,7 @@ namespace DeepseaOil.Data
             return new WaveSpec(_holder.Tables.TbWave.Get(id));
         }
 
-        /// <summary>全部关卡初始格子状态，返回生成行供一次性遍历；表当前 0 行且无关卡维度，属待填充基础设施，不要因表空删链</summary>
+        /// <summary>全部关卡初始格子状态，返回生成行供一次性遍历；表当前 0 行，不要因表空删链</summary>
         public static IReadOnlyList<TileInitial> GetTileInitials()
         {
             EnsureAssets();
@@ -301,7 +301,7 @@ namespace DeepseaOil.Data
         // 边界：只读；调用方不得跨帧持有该引用；新增消费必须登记在本注释里
 
         /// <summary>原始生成表（cfg.Tables），只给诊断用，正常取值一律走上面的 GetXxx</summary>
-        /// <remarks>当前无登记破例（原 Presentation/Diagnostics/ConfigLoader.cs 已随死代码清理删除）。新增破例必须先登记在这里</remarks>
+        /// <remarks>当前无登记破例。新增破例必须先登记在这里</remarks>
         public static cfg.Tables Tables
         {
             get

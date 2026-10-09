@@ -41,7 +41,6 @@ namespace DeepseaOil.Presentation.UI
                     GameRoot.Instance.UI.HidePanel<SettingPanel>();
                     break;
                 case "BtnReturnMenu":
-                    // 切换到开始场景
                     GameRoot.Instance.Game.ChangeState(GameState.Menu);
                     break;
             }

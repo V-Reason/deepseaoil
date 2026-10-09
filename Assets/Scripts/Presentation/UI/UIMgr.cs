@@ -15,8 +15,8 @@ namespace DeepseaOil.Presentation.UI
         System,
     }
 
-    /// <summary>管理所有 UI 面板，普通类由 GameRoot 持有，异步加载的协程也由 GameRoot 托管</summary>
-    /// <remarks>面板预设体名必须与类名一致。三件套的创建在 Init，唯一调用点是 GameRoot。</remarks>
+    /// 管理所有 UI 面板，普通类由 GameRoot 持有，异步加载的协程也由 GameRoot 托管
+    /// 面板预设体名必须与类名一致；三件套的创建在 Init，唯一调用点是 GameRoot。
     public class UIMgr : IUIOperation
     {
         private abstract class BasePanelInfo
@@ -55,10 +55,10 @@ namespace DeepseaOil.Presentation.UI
         private Canvas uiCanvas;
         private EventSystem uiEventSystem;
 
-        /// <summary>装配是否完成</summary>
+        /// 装配是否完成
         public bool IsReady { get; private set; }
 
-        /// <summary>重复 EventSystem 是否已报过一次（防刷屏）</summary>
+        /// 重复 EventSystem 是否已报过一次（防刷屏）
         private bool _warnedDuplicateEventSystem;
 
         private Transform bottomLayer;
@@ -86,7 +86,7 @@ namespace DeepseaOil.Presentation.UI
         {
         }
 
-        /// <summary>装配 UI 三件套，唯一调用点是 GameRoot.Assemble</summary>
+        /// 装配 UI 三件套，唯一调用点是 GameRoot.Assemble
         public void Init()
         {
             if (IsReady)
@@ -115,8 +115,8 @@ namespace DeepseaOil.Presentation.UI
             IsReady = true;
         }
 
-        /// <summary>拆除三件套并归还资源引用计数</summary>
-        /// <remarks>必须早于 AssetModule.Dispose，且必须幂等。</remarks>
+        /// 拆除三件套并归还资源引用计数
+        /// 必须早于 AssetModule.Dispose，且必须幂等。
         public void Dispose()
         {
             if (!IsReady) return;
@@ -152,8 +152,8 @@ namespace DeepseaOil.Presentation.UI
             systemLayer = null;
         }
 
-        /// <summary>停用场景里多余的 EventSystem 并就该去清理场景报一次错</summary>
-        /// <remarks>停用而非销毁：场景那份是用户资产，停用足以让它走 OnDisable 摘掉注册。必须用 includeInactive 重载，失活的那份被激活时警告会回来。</remarks>
+        /// 停用场景里多余的 EventSystem 并就该去清理场景报一次错
+        /// 停用而非销毁：场景那份是用户资产，停用足以让它走 OnDisable 摘掉注册；必须用 includeInactive 重载，失活的那份被激活时警告会回来。
         private void DisableSceneEventSystems()
         {
             //调用点在实例化 ui/EventSystem 之前
@@ -199,7 +199,7 @@ namespace DeepseaOil.Presentation.UI
             }
         }
 
-        /// <summary>显示面板；isSync 方法体从不读</summary>
+        /// 显示面板；isSync 方法体从不读
         public void ShowPanel<T>(UnityAction<T> callBack = null, bool isSync = true) where T : BasePanel
         {
             string panelName = typeof(T).Name;
@@ -228,11 +228,11 @@ namespace DeepseaOil.Presentation.UI
 
             panelDic.Add(panelName, new PanelInfo<T>(this, callBack));
 
-            // GameRoot 是全工程唯一常驻 MonoBehaviour（DontDestroyOnLoad），UIMgr 不是 MonoBehaviour，协程由它托管
+            // UIMgr 不是 MonoBehaviour，协程必须由常驻的 GameRoot 托管
             GameRoot.Instance.StartCoroutine(CoLoadPanel<T>(panelName));
         }
 
-        /// <remarks>轮询而非 await：await 续体会在 AssetModule.Tick 分发循环里重入 UIMgr</remarks>
+        /// 轮询而非 await：await 续体会在 AssetModule.Tick 分发循环里重入 UIMgr
         private System.Collections.IEnumerator CoLoadPanel<T>(string panelName) where T : BasePanel
         {
             string key = UI_PANEL_PREFIX + panelName;

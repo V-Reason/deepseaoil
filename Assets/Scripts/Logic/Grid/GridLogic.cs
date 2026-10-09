@@ -9,18 +9,17 @@ using DeepseaOil.Logic.Events;
 
 namespace DeepseaOil.Logic.Grid
 {
-    /// <summary>格子系统逻辑门面，持有格子状态、调度 Tick、处理落地与状态转换、对格上目标结算效果</summary>
-    /// <remarks>伤害全由格子产生（Apply），来源是状态配置行。Tick 请求双缓冲：本帧提交、下帧消费；状态转换进待处理表，Tick 循环后统一结算。表数据全部构造注入，元素合成与规则匹配在元素层，本类不碰 Tilemap/物理/Time/ConfigModule。</remarks>
+    /// <summary>格子系统门面：持有状态与调度</summary>
+    /// <remarks>伤害全由格子产生（Apply）。Tick 请求双缓冲：本帧提交、下帧消费；状态转换进待处理表、Tick 后结算。</remarks>
     public sealed class GridLogic : ITileScheduler, ITileResolver
     {
-        /// <summary>击退衰减率（1/秒），只用于格→冲量换算；与 EnemyTuning.knockbackDecay 同源，那边改了这边要跟（见 Docs/待办.md）</summary>
+        /// <summary>击退衰减率（1/秒）；与 EnemyTuning.knockbackDecay 同源，改了要跟</summary>
         private const float KnockbackDecayPerSecond = 10f;
 
         public GridGeometry Geometry => _geometry;
 
         public EnemyCellRegistry Registry => _registry;
 
-        /// <summary>当前有状态的格数（诊断用，0=场上无泥浆之类）</summary>
         public int ActiveStateCount => _machines.Count;
 
         public int CellCount => _cells.Count;
@@ -31,35 +30,30 @@ namespace DeepseaOil.Logic.Grid
         private readonly EnemyCellRegistry _registry;
         private readonly IElementReactor _element;
 
-        /// <summary>合法格，只有登记过的格能被转换/结算；表现层从 Tilemap 枚举地板登记</summary>
+        /// <summary>合法格；表现层登记，未登记不参与转换</summary>
         private readonly HashSet<Vector3Int> _cells = new();
 
         private readonly Dictionary<Vector3Int, TileStateMachine> _machines = new();
 
         private readonly TileTickQueue _queue = new();
 
-        /// <summary>待生效状态转换，Tick 循环后统一结算，同格后者胜</summary>
+        /// <summary>待生效转换，Tick 后结算，后者胜</summary>
         private readonly Dictionary<Vector3Int, TileStateType> _pending = new();
         private readonly List<KeyValuePair<Vector3Int, TileStateType>> _pendingScratch = new();
 
-        /// <summary>结算时目标快照缓冲，受害方可能在结算里死亡并注销自己</summary>
+        /// <summary>目标快照：受害方可能在结算中死亡注销</summary>
         private readonly List<IEffectTarget> _dealScratch = new();
 
-        /// <summary>待结算的"跨格进入"事件：物理帧登记（表现层换格时），本类 Tick 统一结算 —— 效果施加因此只有一个相位</summary>
+        /// <summary>待结算"跨格进入"：物理帧登记、Tick 统一结算</summary>
         private readonly List<(Vector3Int Cell, IEffectTarget Target)> _pendingEnters = new();
 
-        /// <summary>已告警过的（格, 效果号）：状态每帧重新提交清单，不设闸门会把 Console 刷爆</summary>
+        /// <summary>已告警的（格,效果号）：状态每帧重提交会刷爆 Console</summary>
         private readonly HashSet<(int X, int Y, int Z, int Kind)> _warnedEffects = new();
 
         private float _now;
         private float _deltaTime;
 
-        /// <remarks>
-        /// stateFactory 返回 null=该 ID 没有实现；element=null 时落地不产生反应；registry=null 时自建。
-        /// 效果数值不在这里注入：tile_effect 表的档位在数据层（<c>TileStateSpec</c> / <c>ElementRuleSpec</c>）已按
-        /// <c>effectValuePos</c> 定值，本类只消费 <see cref="TileEffectValue"/>。传整张表进来再按效果号查档，
-        /// 只会覆盖掉调用方选好的档位（燃烧第 2 档曾被钉回第 1 档 ⇒ 0.5 点 ⇒ 取整成 0 ⇒ 完全不掉血）。
-        /// </remarks>
+        /// <remarks>stateFactory 返回 null=未实现；element=null 不产生反应；registry=null 自建。数值不在此注入：tile_effect 档位已按 effectValuePos 定值。</remarks>
         public GridLogic(
             in GridGeometry geometry,
             IReadOnlyList<TileStateSpec> stateSpecs,
@@ -81,8 +75,8 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>登记一个合法格，同时按该格原本是什么地从 tile_state 表灌一次元素</summary>
-        /// <remarks>D9 只覆盖切状态，常规格没人刷过、元素恒为空，整条反应链判据会不同。默认状态由 LoadInitialStates 给，两处都登记时后到者优先。</remarks>
+        /// <summary>登记合法格，并按原本的地灌一次 tile_state 元素</summary>
+        /// <remarks>常规格元素恒为空，反应链判据不同；默认状态由 LoadInitialStates 给。</remarks>
         public void RegisterCell(Vector3Int cell, TileStateType initial = TileStateType.Normal)
         {
             if (!_cells.Add(cell)) return;
@@ -101,7 +95,6 @@ namespace DeepseaOil.Logic.Grid
             _element.FlushStateElement(cell, in spec);
         }
 
-        /// <summary>本格是否合法（存在地板），不合法时落地无效果</summary>
         public bool HasCell(Vector3Int cell)
         {
             return _cells.Contains(cell);
@@ -119,7 +112,7 @@ namespace DeepseaOil.Logic.Grid
                 : TileStateType.Normal;
         }
 
-        /// <summary>按关卡数据灌入初始状态，刻意不产生伤害，无地板的格忽略不报错</summary>
+        /// <summary>灌入关卡初始状态，不产生伤害</summary>
         public int LoadInitialStates(IReadOnlyList<TileInitial> states)
         {
             if (states == null) return 0;
@@ -149,7 +142,7 @@ namespace DeepseaOil.Logic.Grid
             _now = now;
             _deltaTime = deltaTime;
 
-            // 进格效果先结算：换格发生在物理帧，效果落在这里（渲染帧），且要早于本节拍的周期清单
+            // 进格效果先结算：换格在物理帧，须早于本节拍清单
             DrainPendingEnters();
 
             _queue.Swap();
@@ -168,8 +161,8 @@ namespace DeepseaOil.Logic.Grid
             DrainPendingTransitions();
         }
 
-        /// <summary>一次球落地：合成球元素与地形元素→查反应规则→切结果状态并提交效果清单</summary>
-        /// <remarks>返回 false：落在地板外、规则不给状态（None）或结果就是当前状态。没切状态时把元素改动收回去，否则兜底行（结果 None）会把合成结果留在格子上。</remarks>
+        /// <summary>球落地：合成元素→查规则→切状态</summary>
+        /// <remarks>返回 false：地板外、规则不给状态（None）或结果即当前状态。没切状态时元素改动要收回。</remarks>
         public bool OnBallHit(Vector3Int cell, in ElementValue ballElement)
         {
             if (!_cells.Contains(cell)) return false;
@@ -186,8 +179,7 @@ namespace DeepseaOil.Logic.Grid
             {
                 _element.FlushStateElement(cell, in currentSpec);
 
-                // 规则命中但"不改地形"（兜底行的击退这类）：地形不变，效果照样要落地。
-                // 曾经这里直接 return ⇒ 兜底行的冲量被闷在判定里，"砸中了却什么都不发生"。
+                // 规则命中但不改地形（兜底行的击退）：效果照样落地。
                 ApplyEnterImpact(cell, TileStateType.None, reaction.Effects);
 
                 return false;
@@ -205,14 +197,13 @@ namespace DeepseaOil.Logic.Grid
             _queue.Schedule(cell);
         }
 
-        /// <remarks>同格一帧内被请求多次时后者胜。</remarks>
         public void Transition(Vector3Int cell, TileStateType next)
         {
             _pending[cell] = next;
         }
 
-        /// <summary>效果总出口：对格上目标结算一次效果，改格子自身的效果按种类转交 ApplyToCell</summary>
-        /// <remarks>按目标能力分流：受伤/减速/击退/麻痹各吃各的；玩家不在归属表里（D7），泥浆不减速玩家。未实现的效果种类必须出声（WarnUnsupported），不许 default: return 吞掉。瞬时伤害/DoT/减速/击退/麻痹五条分支零分配。</remarks>
+        /// <summary>效果出口：格上目标结算；改格子的转交 ApplyToCell</summary>
+        /// <remarks>玩家不在归属表里，泥浆不减速玩家；未实现种类必须 WarnUnsupported，零分配。</remarks>
         public void Apply(Vector3Int cell, in TileEffectValue effect)
         {
             switch (effect.Kind)
@@ -222,9 +213,7 @@ namespace DeepseaOil.Logic.Grid
                     return;
 
                 case TileEffectKind.DamageOverTime:
-                    // 数值与节奏都取"状态自己那一档"：effect 在数据层已按 effectValuePos 定好值（燃烧第 2 档 = 1 点/秒）。
-                    // 🔴 这里曾经再查一次表并钉死第 1 档，把燃烧静默降成 0.5 —— 而 EnemyStats 按 RoundToInt 取整，
-                    // 0.5 舍成 0 ⇒ 站在燃烧上一点都不掉血（实测）。
+                    // 数值取状态那一档：数据层已按 effectValuePos 定值（燃烧第 2 档 = 1/秒）。
                     Deal(cell, effect.PerTick);
                     return;
 
@@ -240,27 +229,24 @@ namespace DeepseaOil.Logic.Grid
                     ApplyStun(cell, effect.Seconds);
                     return;
 
-                // 这两条是"改格子自身"的效果，本就该走 ApplyToCell；状态的效果清单只有一个提交口
-                // （TableTileState.SubmitAll 与 ApplyEnterImpact 都调 Apply），故在这里按种类转交，
-                // 否则它们会落进 default 被当成"未实现"逐格告警 —— 反应配了没效果的最坏形态。
+                // 这两条改格子自身，本该走 ApplyToCell；两处提交口都调 Apply，故在此转交。
                 case TileEffectKind.InheritElement:
                 case TileEffectKind.ClearPlants:
                     ApplyToCell(cell, in effect);
                     return;
 
-                // 无效果是合法取值（表里没填 / 解析成 None），不是"未实现"，静默跳过。
+                // 无效果是合法取值（表里没填），静默跳过。
                 case TileEffectKind.None:
                     return;
 
-                // Slide 本轮未实现（缺滑行能力接口）；Skid/Block/Fixed 连枚举位都还没有，走到这里说明有人把表号硬塞了进来。
+                // Slide 未实现（缺滑行接口）；Skid/Block/Fixed 无枚举位，此处表号被硬塞。
                 default:
                     WarnUnsupported(cell, effect.Kind);
                     return;
             }
         }
 
-        /// <summary>地形改写通道：只改 cell 自身（D4：状态实现不许碰别的格）；温湿度继承与清除植物都走这里</summary>
-        /// <remarks>注意与 D9 的顺序：切状态时本口在 SwitchState 的 OnEnter 里先跑，随后 SwitchState 会把新状态表的元素初值刷到格上（FlushStateElement），因此"继承小球属性"的结果会被状态初值覆盖。要让继承真的留在格上，需要把进格效果挪到 flush 之后 —— 那是格→元素链的口径变更，不在本轮范围内。</remarks>
+        /// <remarks>地形改写通道：只改 cell 自身（状态实现不许碰别的格）。本口在 SwitchState 的 OnEnter 里先跑，随后新状态初值会刷上格覆盖"继承小球属性"的结果。</remarks>
         public void ApplyToCell(Vector3Int cell, in TileEffectValue effect)
         {
             if (_element == null) return;
@@ -285,7 +271,7 @@ namespace DeepseaOil.Logic.Grid
                 {
                     ElementValue current = _element.GetElement(cell);
 
-                    // 只清本格：表里范围是十字，跨格需要"对邻居下命令"的通道（D4）。
+                    // 只清本格：表里范围是十字，跨格缺邻居命令通道。
                     _element.SetElement(cell, new ElementValue(
                         current.Type,
                         current.Tags & ~ElementTag.Plant,
@@ -299,7 +285,6 @@ namespace DeepseaOil.Logic.Grid
                 case TileEffectKind.None:
                     return;
 
-                // 伤害/减速/击退这类效果该走 Apply（对格上目标），走到本格口说明调用方选错了口。
                 default:
                     WarnUnsupported(cell, effect.Kind);
                     return;
@@ -311,8 +296,7 @@ namespace DeepseaOil.Logic.Grid
             _element?.SetElement(cell, in element);
         }
 
-        /// <summary>未实现 / 未完全支持的地块效果：必须出声，严禁 default: return 静默吞掉</summary>
-        /// <remarks>按（格, 效果号）只报一次：同一格的状态每帧都会重新提交清单，逐帧报会把 Console 刷爆，而报过一次已足够定位配置事故。字符串只在首次命中时构造，Supported 效果不受影响（那些分支直接 return，无分配）。</remarks>
+        /// <remarks>未实现的块效果必须出声；按（格, 效果号）只报一次以免刷爆 Console，无分配。</remarks>
         private void WarnUnsupported(Vector3Int cell, TileEffectKind kind)
         {
             if (!_warnedEffects.Add((cell.x, cell.y, cell.z, (int)kind))) return;
@@ -320,12 +304,7 @@ namespace DeepseaOil.Logic.Grid
             Debug.LogWarning($"[Grid] 收到未完全支持的地块效果: {kind}（位于格 {cell}），当前跳过执行。");
         }
 
-        /// <summary>续一次减速修饰，不做快照；离开泥浆⇒不再续命⇒修饰自然过期。</summary>
-        /// <remarks>
-        /// 🔴 这里**不再**把 seconds&lt;=0 替换成一帧 Δt：表里没填时长就是"只要在格子上就持续生效"，
-        /// 窗口交给消费者（StatusGroup）按自己的拍决定。生产者这一侧替换等于把窗口钉成渲染帧 0.0167s，
-        /// 而消费者按物理帧 0.02s 扣 —— 短于一拍就被扣穿，表现成"贴着走也不减速"。暂停帧 Δt=0 也不凭空续命。
-        /// </remarks>
+        /// <remarks>续减速不做快照，离泥浆自然过期；没填时长=在格子上持续生效，窗口交给消费者（StatusGroup）按自己的拍扣；替换成一帧 Δt 会短于其物理帧被扣穿。</remarks>
         private void ApplySlow(Vector3Int cell, float speedScale, float seconds)
         {
             if (!_registry.TryGetIn(cell, out List<IEffectTarget> targets) || targets.Count == 0) return;
@@ -336,8 +315,8 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>目标跨格进入某格：把该格当前状态的"进格一下"效果补给这一个目标，不波及同格其他人</summary>
-        /// <remarks>表现层在目标换格时调；登记后随最近一次 Tick 结算，同一格多人各进各算。</remarks>
+        /// <summary>目标跨格进入：只给该目标补该格"进格一下"</summary>
+        /// <remarks>表现层换格时调；随最近一次 Tick 结算。</remarks>
         public void OnActorEnterCell(Vector3Int cell, IEffectTarget target)
         {
             if (target == null) return;
@@ -359,7 +338,7 @@ namespace DeepseaOil.Logic.Grid
             _pendingEnters.Clear();
         }
 
-        /// <summary>进格那一下：只补给这一个目标，且只补"一次性"的效果（持续/周期效果由状态节拍负责）</summary>
+        /// <summary>进格那一下：只给这一个目标补一次性效果</summary>
         private void ApplyEnterEffectsToOne(Vector3Int cell, IEffectTarget target)
         {
             if (target == null || !target.IsAlive) return;
@@ -391,8 +370,7 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>按格数击退：冲量 = 格数 × 格边长 × 击退衰减率</summary>
-        /// <remarks>value1 单位是格，ApplyKnockback 收速度（单位/秒）；总位移 ≈ 冲量/衰减率，故乘回衰减率。换算在执行者。</remarks>
+        /// <summary>按格数击退：冲量 = 格数 × 格边长 × 衰减率；总位移 ≈ 冲量/衰减率故乘回</summary>
         private void ApplyKnockback(Vector3Int cell, float cells)
         {
             if (cells <= 0f) return;
@@ -407,7 +385,6 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>对单个目标按格数击退（方向按格心→目标算）</summary>
         private void KnockOne(IEffectTarget target, Vector2 center, float cells)
         {
             if (cells <= 0f || target == null || !target.IsAlive) return;
@@ -426,7 +403,7 @@ namespace DeepseaOil.Logic.Grid
             knockbackable.ApplyKnockback(direction * magnitude);
         }
 
-        /// <summary>麻痹：时长交给目标，是否进门禁由目标决定（本轮只到"提交"层）。</summary>
+        /// <summary>麻痹：时长与门禁由目标决定。</summary>
         private void ApplyStun(Vector3Int cell, float seconds)
         {
             if (seconds <= 0f) return;
@@ -439,7 +416,7 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>对格上目标结算一次伤害（方向按格心→受害者各算一份）</summary>
+        /// <summary>结算格上目标伤害（方向按格心→受害者）</summary>
         private void Deal(Vector3Int cell, float amount)
         {
             if (amount <= 0f) return;
@@ -457,7 +434,6 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>对单个目标结算一次伤害（方向按格心→受害者算）</summary>
         private static void DealOne(IEffectTarget target, Vector2 center, float amount)
         {
             if (amount <= 0f) return;
@@ -466,14 +442,14 @@ namespace DeepseaOil.Logic.Grid
 
             if (!target.IsAlive) return;
 
-            // 不能受伤的目标照样能被减速与击退，只是不吃伤害。
+            // 不可受伤者仍可被减速/击退，只是不吃伤害。
             if (target is not IDamageable damageable) return;
 
             damageable.TakeDamage(Damage.At(center, target.Position, amount, DamageSource.Tile));
         }
 
-        /// <summary>切换某格状态，同状态时 no-op（不重入、不重置计时）；applyEnterImpact=是否给进格冲击：球落地与状态自发起给，开局加载绝不给</summary>
-        /// <remarks>enterEffects=null 用状态自带的 spec.EnterEffects。</remarks>
+        /// <summary>切换某格状态，同状态 no-op；applyEnterImpact=是否给进格冲击（开局加载不给）</summary>
+        /// <remarks>enterEffects=null 时用状态自带的清单。</remarks>
         public bool SwitchState(
             Vector3Int cell,
             TileStateType next,
@@ -482,12 +458,10 @@ namespace DeepseaOil.Logic.Grid
         {
             if (!_cells.Contains(cell)) return false;
 
-            // 配置里没有这一行就不算转换。
             if (next != TileStateType.Normal && !_specs.ContainsKey(next)) return false;
 
             if (!_machines.TryGetValue(cell, out TileStateMachine machine))
             {
-                // 常规→常规不建状态机。
                 if (next == TileStateType.Normal) return false;
 
                 machine = new TileStateMachine();
@@ -499,7 +473,6 @@ namespace DeepseaOil.Logic.Grid
 
             if (!changed)
             {
-                // 空状态机要摘掉。
                 if (machine.Current == null) _machines.Remove(cell);
 
                 return false;
@@ -508,7 +481,6 @@ namespace DeepseaOil.Logic.Grid
             if (machine.CurrentId == TileStateType.Normal) _machines.Remove(cell);
             else _machines[cell] = machine;
 
-            // D9：切状态时把该状态元素四件刷到格子上作初值。
             if (_element != null && _specs.TryGetValue(next, out TileStateSpec spec))
             {
                 _element.FlushStateElement(cell, in spec);
@@ -521,20 +493,14 @@ namespace DeepseaOil.Logic.Grid
             return true;
         }
 
-        /// <summary>提交进格冲击：规则给的清单（落地那一下的劲）与状态自带的"进格一下"都要落地</summary>
-        /// <remarks>
-        /// 🔴 两者不是二选一。曾经写成"给了规则清单就用它，否则用状态清单"：规则清单**为空**（多数 `element_rule` 行的
-        /// effects 列是空的）时，状态自己的进格效果被整段吞掉 —— 冰沙的"瞬时伤害"就是这么丢的（它只在周期清单里被跳过，
-        /// 见 TableTileState.SubmitAll 的 IsEnterOnly 分支，于是谁都不打）。
-        /// 状态清单里的非一次性效果（减速/持续伤害）仍由 Tick 节拍负责，这里只补一次性那部分。
-        /// </remarks>
+        /// <summary>提交进格冲击：规则清单与状态的"进格一下"都要落地</summary>
+        /// <remarks>两者不是二选一：规则清单为空（多数 element_rule 行 effects 列空）时会吞掉状态的进格一下；非一次性效果由 Tick 拍负责。</remarks>
         private void ApplyEnterImpact(Vector3Int cell, TileStateType state, IReadOnlyList<TileEffectValue> enterEffects)
         {
             bool hasState = _specs.TryGetValue(state, out TileStateSpec spec);
 
             if (enterEffects == null || enterEffects.Count == 0)
             {
-                // 没人给清单：状态自带清单全量落地一次（原行为）
                 if (!hasState) return;
 
                 ApplyEffectList(cell, spec.EnterEffects, enterOnly: false);
@@ -544,7 +510,6 @@ namespace DeepseaOil.Logic.Grid
 
             ApplyEffectList(cell, enterEffects, enterOnly: false);
 
-            // 规则清单存在时，状态自己的"进格一下"仍要补上（它在周期清单里被跳过，没人补就永远不打）
             if (hasState) ApplyEffectList(cell, spec.EnterEffects, enterOnly: true);
         }
 
@@ -568,7 +533,7 @@ namespace DeepseaOil.Logic.Grid
         {
             if (_pending.Count == 0) return;
 
-            // 先搬走再处理：处理中发起的新请求留到下一帧，连锁有确定上界。
+            // 先搬走再处理：处理中的新请求留到下一帧，连锁有上界。
             _pendingScratch.Clear();
 
             foreach (KeyValuePair<Vector3Int, TileStateType> pair in _pending)
@@ -592,7 +557,6 @@ namespace DeepseaOil.Logic.Grid
         {
             if (_stateFactory == null) return;
 
-            // 只有配置里出现过的 ID 才注册工厂。
             foreach (KeyValuePair<TileStateType, TileStateSpec> pair in _specs)
             {
                 TileStateType id = pair.Key;

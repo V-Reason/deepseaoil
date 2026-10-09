@@ -12,16 +12,11 @@ using cfg.dso;
 
 namespace DeepseaOil.Presentation.Diagnostics
 {
-    /// <summary>地块反应独立驱动器：不打球、不投掷，直接用鼠标把"球元素"砸到格子顶端，专验元素反应链与地块效果链</summary>
-    /// <remarks>
-    /// 自愈装配：ConfigModule / AssetModule / GameRoot / GameState 与格子系统，缺哪补哪 —— 本场景可以单独打开进 Play，
-    /// 也可以和 CombatRoot 同场（此时复用它的格子系统，不重复登记、不重复 Tick）。
-    /// 驱动不走 Update：实现 ISceneRoot + IRenderTicked 由 GameRoot 推进（全工程唯一驱动入口，见 AGENTS 第 5 节）。
-    /// 落地事实由 Logic 层的 [Reaction] 追踪输出（ReactionResolver.TraceEnabled），本类只负责点、选与读数。
-    /// </remarks>
+    /// <summary>地块反应独立驱动器：用鼠标把球元素砸到格子顶端，专验元素反应链与地块效果链</summary>
+    /// <remarks>自愈装配配置 / 资源 / GameRoot / 格子系统，缺哪补哪：可单独进 Play，也可与 CombatRoot 同场（复用其格子系统，不重复登记与 Tick）；驱动经 ISceneRoot 交 GameRoot（全工程唯一驱动入口）；落地事实由 Logic 层 [Reaction] 追踪输出（ReactionResolver.TraceEnabled），本类只管点选与读数。</remarks>
     public sealed class GridReactionHarness : MonoBehaviour, ISceneRoot, IRenderTicked
     {
-        /// <summary>世界侧与 CombatRoot 同序：自己 Tick 格子时排在玩家之后即可</summary>
+        /// 世界侧与 CombatRoot 同序：自己 Tick 格子时排在玩家之后
         public int Order => SceneOrder.World;
 
         [Tooltip("地板层适配器。必接：格子几何与合法格集合都从它来。")]
@@ -36,10 +31,10 @@ namespace DeepseaOil.Presentation.Diagnostics
         [Tooltip("面板放大倍数（相对 IMGUI 默认 12px 字号）。实际倍数还会按屏幕收口，保证面板不过屏幕中线；0/负数按 2 倍兜底。")]
         [SerializeField] private float guiScale = 2f;
 
-        /// <summary>本类是否自己持有格子系统：false = 复用 CombatRoot 的（那么 Tick 也归它）</summary>
+        /// 是否自持格子系统：false = 复用 CombatRoot 的（Tick 也归它）
         private bool _ownsGrid;
 
-        /// <summary>本类是否订阅了状态变化事件（只在自己 Attach 过适配器时负责退订）</summary>
+        /// 是否订阅状态变化事件（只在 Attach 过适配器时负责退订）
         private bool _attachedAdapter;
 
         private GridLogic _grid;
@@ -49,10 +44,10 @@ namespace DeepseaOil.Presentation.Diagnostics
         private GameRoot _root;
         private Camera _camera;
 
-        /// <summary>球种清单，配置就绪后取一次</summary>
+        /// 球种清单，配置就绪后取一次
         private IReadOnlyList<ProjectileSpec> _balls;
 
-        /// <summary>状态号 → 中文名，只在面板上显示；构造期取一次，避免每帧查表</summary>
+        /// 状态号 → 中文名，构造期取一次，避免每帧查表
         private readonly Dictionary<TileStateType, string> _stateNames = new();
 
         private int _selectedBall;
@@ -72,7 +67,7 @@ namespace DeepseaOil.Presentation.Diagnostics
                 return;
             }
 
-            // 切片就是来看反应链的：默认打开 Logic 层的 [Reaction] 追踪。
+            // 切片就是看反应链的：默认打开 Logic 层 [Reaction] 追踪
             ReactionResolver.TraceEnabled = true;
 
             _balls = ConfigModule.GetAllBalls();
@@ -89,20 +84,19 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (_attachedAdapter && adapter != null) adapter.Detach();
         }
 
-        /// <summary>自愈装配：配置 → 资源 → GameRoot → 运行态</summary>
-        /// <remarks>顺序不能反：GameRoot.Assemble 自己会做 ConfigModule.Init → AssetModule.Init → BindAssets，先建它最省事。场景里已有 GameRoot 时它的 Awake 早已跑完，这里的判断全成 no-op。</remarks>
+        /// 自愈装配：配置 → 资源 → GameRoot → 运行态；顺序不能反 —— GameRoot.Assemble 自己做 Init → BindAssets，先建它最省事
         private void EnsureRuntime()
         {
             if (!ConfigModule.IsReady) ConfigModule.InitFromStreamingAssets();
 
-            // 场景里没有 GameRoot 就现造一个最小运行时（取 Instance 时会建对象并跑它的 Awake）
+            // 没有 GameRoot 就现造一个（取 Instance 时会建对象并跑 Awake）
             GameRoot root = GameRoot.Instance;
 
             if (!AssetModule.IsInitialized) AssetModule.Init();
 
             if (!ConfigModule.AreAssetsBound) ConfigModule.BindAssets();
 
-            // GameRoot 开局把自己停在 Menu（= 暂停，deltaTime 为 0），切片必须推回 Running 才能看到时间流动
+            // GameRoot 开局停在 Menu（= 暂停，deltaTime 为 0），切片必须推回 Running
             if (root.Game != null && root.Game.CurState != GameState.Running)
             {
                 GameState previous = root.Game.CurState;
@@ -113,7 +107,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             }
         }
 
-        /// <summary>GameRoot 在第一个被驱动的帧调一次：拿不到 CombatRoot 的格子系统就地装一套最小运行时</summary>
+        /// GameRoot 首个被驱动帧调一次：拿不到 CombatRoot 的格子系统就本地装一套
         public void Attach()
         {
             if (_grid != null) return;
@@ -144,7 +138,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Debug.Log($"[Harness] 地块反应切片就绪：合法格 {_grid.CellCount} 个，球种 {_balls?.Count ?? 0} 个。");
         }
 
-        /// <summary>本地装一套最小运行时：元素层（反应规则）＋ 格子层（状态与效果），并把地板格登记进去</summary>
+        /// 本地最小运行时：元素层（反应规则）＋ 格子层（状态与效果），并登记地板格
         private void BuildLocalGrid()
         {
             _registry = new EnemyCellRegistry();
@@ -167,8 +161,7 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             int cells = adapter.RegisterCells(_grid);
 
-            // 与 CombatRoot 同一口径：初始地块优先读场景里的 InitialSetup 笔刷层，没刷才退回表驱动。
-            // 本切片没有 CombatRoot（这是它唯一的驱动器），少了这一行 InitialSetup 上刷的东西在这张场景里永远不会生效。
+            // 与 CombatRoot 同一口径：初始地块优先读场景 InitialSetup 笔刷层，没刷才退回表驱动；本切片没有 CombatRoot，少了这一行 InitialSetup 刷的东西永不生效
             int initialStates = adapter.LoadInitialSetupTiles(_grid);
 
             if (initialStates == 0)
@@ -181,7 +174,7 @@ namespace DeepseaOil.Presentation.Diagnostics
                 $"反应规则 {ConfigModule.GetElementRules().Count} 条。");
         }
 
-        /// <summary>状态工厂：给 ID 造新实例，null=该 ID 没有实现（与 CombatRoot 用同一套表驱动实现）</summary>
+        /// 状态工厂：给 ID 造新实例，null=该 ID 没有实现（与 CombatRoot 同一套表驱动）
         private static ITileState CreateTileState(TileStateType id)
         {
             TileStateSpec spec = ConfigModule.TryGetTileState(id);
@@ -189,7 +182,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             return spec != null ? new TableTileState(spec) : null;
         }
 
-        /// <summary>渲染帧：格子先走（泥浆会到期、状态会切），再处理悬停与点击</summary>
+        /// 渲染帧：格子先走（泥浆到期、状态切换），再处理悬停与点击
         public void RenderTick(float deltaTime)
         {
             if (_grid == null) return;
@@ -202,7 +195,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (PollWorldClick()) DropSelectedBall();
         }
 
-        /// <summary>鼠标在 z=0 平面上的世界点；没有鼠标（无指针设备）时返回 false</summary>
+        /// 鼠标在 z=0 平面上的世界点；无鼠标设备时返回 false
         private bool TryMouseWorld(out Vector2 world)
         {
             world = Vector2.zero;
@@ -237,7 +230,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             _hasHover = true;
         }
 
-        /// <summary>左键按下沿；面板上的点击不算落地（IMGUI 的 y 轴朝下，要翻过来判）</summary>
+        /// 左键按下沿；面板点击不算落地（IMGUI y 轴朝下，要翻过来判）
         private bool PollWorldClick()
         {
             Mouse mouse = Mouse.current;
@@ -256,7 +249,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             return true;
         }
 
-        /// <summary>把选中的球元素砸到悬停格上：唯一入口是 GridLogic.OnBallHit</summary>
+        /// 把选中球元素砸到悬停格：唯一入口是 GridLogic.OnBallHit
         private void DropSelectedBall()
         {
             if (_balls == null || _balls.Count == 0) return;
@@ -285,7 +278,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Debug.Log($"[Harness] 落地：球={ball.Name} 元素={ball.Element} 格={cell} 状态 {before} → {after}（changed={changed}）");
         }
 
-        /// <summary>把脚下格直接切成泥浆（不走反应，专验"格上效果"链）</summary>
+        /// 把脚下格直接切成泥浆（不走反应，专验"格上效果"链）
         private void CutMudUnderCursor()
         {
             if (!_hasHover || !_grid.HasCell(_hoverCell)) return;
@@ -310,7 +303,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             return _stateNames.TryGetValue(state, out string name) ? $"{state}({name})" : state.ToString();
         }
 
-        /// <summary>面板在屏幕上的实际矩形：落点判定用，倍数与 OnGUI 同一口径</summary>
+        /// 面板实际矩形：落点判定用，倍数与 OnGUI 同一口径
         private Rect PanelRect() => HarnessGui.ScreenRect(panelOrigin, panelSize, HarnessGui.Scale(guiScale, panelSize));
 
         private void OnGUI()
@@ -318,7 +311,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Matrix4x4 saved = GUI.matrix;
             float scale = HarnessGui.Scale(guiScale, panelSize);
 
-            // 整体缩放：控件坐标仍按设计值写，屏幕占位与字号一起放大（落点判定按放大后的算）
+            // 整体缩放：控件坐标按设计值写，屏幕占位与字号一起放大（落点判定按放大后的算）
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
             GUILayout.BeginArea(new Rect(panelOrigin.x, panelOrigin.y, panelSize.x, panelSize.y), GUI.skin.box);

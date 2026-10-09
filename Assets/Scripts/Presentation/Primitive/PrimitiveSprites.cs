@@ -3,8 +3,7 @@ using UnityEngine;
 namespace DeepseaOil.Presentation.Primitive
 {
     /// <summary>运行期生成的两张纯色 sprite：圆点与方块/圆环，缺美术资源时的 fallback</summary>
-    /// <remarks>不给 SpriteRenderer 留空 sprite：会画默认白色方块，只受 localScale 控制，与"球多大/阴影缩多少"互相覆盖。
-    /// 具名 pixelsPerUnit 让"半径几米"与 localScale 的换算是确定的数；HideFlags.HideAndDontSave 防被 Resources.UnloadUnusedAssets() 回收。</remarks>
+    /// <remarks>不给 SpriteRenderer 留空 sprite：会画默认白色方块，只受 localScale 控制，与"球多大/阴影缩多少"互相覆盖。具名 pixelsPerUnit 让"半径几米"与 localScale 换算有确定值；HideFlags.HideAndDontSave 防被 Resources.UnloadUnusedAssets() 回收。</remarks>
     public static class PrimitiveSprites
     {
         private const int PointTextureSize = 64;

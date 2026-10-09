@@ -7,9 +7,7 @@ using UnityEngine;
 namespace DeepseaOil.Presentation.Effects.Drivers
 {
     /// <summary>敌人碎裂驱动，耐久归零时飞出 3 块碎片，沿 ctx.Direction 扇形散开，程序生成不需要资源</summary>
-    /// <remarks>
-    /// 碎片形状确定性算出、不读随机数：三块每次都落在同样的相对位置，便于重现。一次碎裂占 PieceCount 个对象，归还时逐个还。
-    /// </remarks>
+    /// <remarks>碎片形状确定性算出、不读随机数：三块总落在同样的相对位置，便于重现。一次碎裂占 PieceCount 个对象，归还时逐个还。</remarks>
     public sealed class ShatterDriver : IEffectDriver
     {
         private const int PieceCount = 3;

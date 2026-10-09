@@ -14,10 +14,9 @@ using UnityEngine;
 namespace DeepseaOil.Presentation
 {
     /// <summary>玩家组合根：组装执行器/配置/活动区域/输入缓冲</summary>
-    /// <remarks>Push 先于 Tick，否则按下沿滞后一帧。方向只归一化一次，WorldInfo 与缓冲快照必须是同一份，各留一份会导致斜向快 √2 倍。</remarks>
+    /// <remarks>Push 先于 Tick，否则按下沿滞后一帧；WorldInfo 与缓冲快照必须共用同一份方向，否则斜向快 √2 倍。</remarks>
     public sealed class PlayerController : MonoBehaviour, ISceneRoot, IPhysicsTicked, IRenderTicked, IManagedActor
     {
-        /// <summary>玩家侧早于世界侧</summary>
         public int Order => SceneOrder.Player;
 
         [SerializeField] private PlayerMotor motor = default;
@@ -32,13 +31,10 @@ namespace DeepseaOil.Presentation
         [Tooltip("视觉适配器，必须挂在子节点 View 上（Root 只放物理与逻辑）。留空则 Awake 自愈：先找子节点，找不到就地造一个 View")]
         [SerializeField] private ActorAnimationView animView = default;
 
-        /// <summary>方向判零容差，吸收摇杆漂移与浮点残渣</summary>
         private const float DirectionEpsilon = 1e-6f;
 
-        /// <summary>8 向吸附一档，45°</summary>
         private const float OctantRadians = 2f * Mathf.PI / 8f;
 
-        /// <summary>键为档位序号</summary>
         private static readonly Dictionary<int, Vector2> Snapped = BuildSnappedTable();
 
         private InputBuffer _buffer;
@@ -47,13 +43,11 @@ namespace DeepseaOil.Presentation
 
         private BoundsArea _bounds;
 
-        /// <summary>配置只在 Attach 取一次，不驻留表现层</summary>
         private PlayerSpec _spec;
 
         /// <summary>瞄准平面深度，世界单位，Attach 取一次</summary>
         private float _cameraPlaneDepth = 100f;
 
-        /// <summary>视觉适配器，挂在子节点 View 上；Root 只承担物理真值与组合根</summary>
         private ActorAnimationView _animView;
 
         private Vector2 _spawnPoint;
@@ -62,19 +56,16 @@ namespace DeepseaOil.Presentation
 
         public PlayerLogic Logic { get; private set; }
 
-        /// <summary>碰撞用物理体位置，不是 transform</summary>
         public Vector2 Position => motor == null ? Vector2.zero : motor.Position;
 
-        /// <summary>视觉适配器（挂在子节点 View 上）；白模期可能整类空转，外部调用一律判空</summary>
         public ActorAnimationView Visual => _animView;
 
         public WorldInfo World => _world;
 
-        /// <summary>引擎回读速度，滞后一个物理步，用于与逻辑层对照</summary>
+        /// <summary>引擎回读速度，滞后一个物理步</summary>
         public Vector2 EngineVelocity => motor == null ? Vector2.zero : motor.EngineVelocity;
 
         /// <summary>原始输入吸附到 8 向并归一化</summary>
-        /// <remarks>零输入返回 Vector2.zero，否则模长恒为 1（WorldInfo 与逻辑层的契约）；吸附同时抹掉摇杆模拟幅度，轻推与推满同速。静态纯函数。</remarks>
         public static Vector2 SnapMoveToEightDirections(Vector2 move, bool snapToEightDirections)
         {
             if (move.sqrMagnitude <= DirectionEpsilon) return Vector2.zero;
@@ -104,7 +95,7 @@ namespace DeepseaOil.Presentation
         }
 
         /// <summary>回出生点并满血</summary>
-        /// <remarks>时机由世界侧决定，本类只执行回哪、满血、停住；出生点越界时钳回来，否则会回到地图外。</remarks>
+        /// <remarks>出生点越界时钳回来，否则会回到地图外。</remarks>
         public void RespawnToSpawn()
         {
             if (Logic == null) return;
@@ -115,7 +106,7 @@ namespace DeepseaOil.Presentation
 
             Logic.RespawnTo(position);
 
-            // 死亡触发器未必已被消费，不清会在复活瞬间补播一次倒地
+            // 死亡触发器未必已被消费，不清会补播一次倒地
             _animView?.ResetToDefault();
         }
 
@@ -125,8 +116,8 @@ namespace DeepseaOil.Presentation
             _animView?.TriggerDie();
         }
 
-        /// <summary>自愈装配视觉子节点：先找子节点 View，找不到就地造一个</summary>
-        /// <remarks>兜底造出来的 View 照抄 Root 上渲染器的 sprite/颜色/排序层，老预制体自愈后视觉不跳变。Sprite 与颜色不在这里配：那属各场景观感。</remarks>
+        /// <summary>本类自愈装配视觉子节点 View</summary>
+        /// <remarks>兜底造出来的 View 照抄 Root 上渲染器的 sprite/颜色/排序层，老预制体自愈后视觉不跳变。</remarks>
         private void EnsureAnimationView()
         {
             if (animView == null) animView = GetComponentInChildren<ActorAnimationView>(true);
@@ -153,7 +144,7 @@ namespace DeepseaOil.Presentation
                 animView = view.AddComponent<ActorAnimationView>();
             }
 
-            // 两个字段各司其职：animView 是序列化接线（Inspector 可见），_animView 是运行期缓存（热路径零判断）
+            // 两个字段各司其职：animView 是序列化接线，_animView 是运行期缓存
             _animView = animView;
         }
 
@@ -170,7 +161,7 @@ namespace DeepseaOil.Presentation
             EnsureAnimationView();
 
             _bounds = ReadBounds();
-            _world = new WorldInfo(Vector2.zero, in _bounds); // 首帧前也不留 default
+            _world = new WorldInfo(Vector2.zero, in _bounds);
             _spawnPoint = motor.Position;
 
             if (!_bounds.IsValid)
@@ -195,7 +186,7 @@ namespace DeepseaOil.Presentation
         }
 
         /// <summary>装配玩家逻辑，由 GameRoot 在第一个被驱动的帧调</summary>
-        /// <remarks>读表必须放这里：ConfigModule 由 GameRoot.Awake 装配，组件 Awake 顺序不保证，写在 Awake 里 ConfigModule 未就绪会抛。缓冲先取 PlayerSpec 再建。</remarks>
+        /// <remarks>读表必须放这里：ConfigModule 由 GameRoot.Awake 装配，组件 Awake 顺序不保证，写在 Awake 里会抛。</remarks>
         public void Attach()
         {
             if (Logic != null || motor == null) return;
@@ -284,8 +275,8 @@ namespace DeepseaOil.Presentation
             }
         }
 
-        /// <summary>按 y 刷新本体渲染档位，场景里填的 sortingOrder 只是初始值</summary>
-        /// <remarks>基准取 Root 的物理体 y 而非 View 的 transform y：View 的 localPosition 会被受击抖动/伪高度改写，拿它排序会让角色随特效上下乱插队。</remarks>
+        /// <summary>按 y 刷新本体排序档位，场景里填的 sortingOrder 只是初始值</summary>
+        /// <remarks>基准取 Root 的物理体 y 而非 View 的 transform y：后者会被受击抖动/伪高度改写。</remarks>
         private void UpdateSortingOrder()
         {
             SpriteRenderer body = _animView != null ? _animView.Renderer : null;
@@ -295,7 +286,7 @@ namespace DeepseaOil.Presentation
             body.sortingOrder = RenderOrder.ActorOrder(Position.y);
         }
 
-        /// <summary>屏幕点→世界点；不读相机 z，它被 Cinemachine 每帧驱动，正交相机下用足够大的常量深度更稳，见 ThrowTuning.cameraPlaneDepth</summary>
+        /// <summary>屏幕点→世界点；不读相机 z，它被 Cinemachine 每帧驱动，用足够大的常量深度更稳，见 ThrowTuning.cameraPlaneDepth</summary>
         private Vector2 AimWorldPoint(Camera camera)
         {
             Vector2 screen = inputProvider.AimScreen;

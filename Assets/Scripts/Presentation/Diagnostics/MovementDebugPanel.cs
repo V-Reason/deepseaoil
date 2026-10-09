@@ -6,8 +6,8 @@ using UnityEngine;
 
 namespace DeepseaOil.Presentation.Diagnostics
 {
-    /// <summary>移动调试面板，显示移动状态、帧首真值与提交量、引擎回读速度、边界接线</summary>
-    /// <remarks>状态机首次进入不发事件，故直接读 MoveGroup.Current；订阅只用于切换历史。提交后预期与引擎速度不一致即引擎干预（撞障碍、外力），属正常。引擎速度是上一物理步的值，滞后一帧。世界边界一行是接线成败的唯一可见指示</remarks>
+    /// 移动调试面板，显示移动状态、帧首真值与提交量、引擎回读速度、边界接线
+    /// 状态机首次进入不发事件，故直接读 MoveGroup.Current；提交后预期与引擎速度不一致即引擎干预（撞障碍、外力），属正常。引擎速度是上一物理步的值，滞后一帧；世界边界一行是接线成败的唯一可见指示
     public sealed class MovementDebugPanel : MonoBehaviour
     {
         [SerializeField] private PlayerController controller = default;
@@ -47,7 +47,6 @@ namespace DeepseaOil.Presentation.Diagnostics
             Matrix4x4 saved = GUI.matrix;
             float scale = HarnessGui.Scale(guiScale, panelSize);
 
-            // 整体缩放：控件坐标仍按设计值写，屏幕占位与字号一起放大（倍数按屏幕收口，见 HarnessGui）
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
             // 拆一层：矩阵恢复只有一处，下面"未接线"那条 return 不会漏掉恢复

@@ -47,9 +47,7 @@ namespace DeepseaOil.Foundation
             => $"active={Active} idle={Idle} peak={Peak} created={TotalCreated} dropped={TotalDropped}";
     }
 
-    /// <remarks>Get/TryGet 空闲区有货就弹出，空了按 PoolOverflowPolicy 处理。
-    /// Prewarm 只造对象不触发回调；Clear 清空闲区并逐个 onDestroy，不动已借出对象；Dispose 幂等，之后再取抛 ObjectDisposedException。
-    /// Release 归还，空闲区达 MaxSize 则不再保留，直接交 onDestroy。MaxSize 是空闲区保留上限，也是 CreateOrDrop 下总量上限。仅主线程，不做锁。</remarks>
+    /// <remarks>Get/TryGet 有货就弹出，空了按 PoolOverflowPolicy 处理。Prewarm 只造对象不触发回调；Clear 清空闲区并逐个 onDestroy，不动已借出对象；Dispose 幂等，之后再取抛 ObjectDisposedException。Release 归还，空闲区达 MaxSize 则不再保留、直接交 onDestroy；MaxSize 既是空闲区保留上限也是 CreateOrDrop 总量上限。仅主线程，不做锁。</remarks>
     public class Pool<T> : IDisposable where T : class
     {
         private readonly string _name;

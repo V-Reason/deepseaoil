@@ -4,8 +4,8 @@ using cfg.dso;
 
 namespace DeepseaOil.Data
 {
-    /// <summary>地块效果取值边界，持有 tile_effect 表行，在数据层完成档位解析</summary>
-    /// <remarks>档位是配置概念，多档在此选好，Logic 只见已定值 TileEffectValue，ITileResolver.Apply 签名不随效果数增长。取档口径 pos 为 1-based（同 effectValuePos 列），越界夹到第 1 档并报 Warning。持生成行 cfg.dso.TileEffect，产出已定值 TileEffectValue</remarks>
+    /// <summary>持有 tile_effect 表行，在数据层完成档位解析</summary>
+    /// <remarks>档位在此选定，Logic 只见已定值 TileEffectValue；pos 为 1-based（同 effectValuePos 列），越界夹第 1 档并报 Warning</remarks>
     public sealed class TileEffectSpec
     {
         private readonly cfg.dso.TileEffect _row;
@@ -19,11 +19,11 @@ namespace DeepseaOil.Data
 
         public string Name => _row.Name;
 
-        /// <summary>表内注释原文，排错用</summary>
+        /// <summary>表内注释原文</summary>
         public string Tip => _row.Tip;
 
-        /// <summary>声明了几档：只认 value1 的条目数</summary>
-        /// <remarks>value2 / interval / flag 是修饰列，单档效果（击退、打滑）本就只填一条。按四列取最小值会把表里写明的第 2 档判成越界：既逐条报 Warning，又把 2 格静默降回 1 格。修饰列短于档数时沿用最后一档（见 Value），不塌成 0。</remarks>
+        /// <summary>只认 value1 的条目数</summary>
+        /// <remarks>value2/interval/flag 是修饰列，短于档数时沿用最后一档（见 Value），不塌成 0</remarks>
         public int LevelCount
         {
             get
@@ -32,13 +32,13 @@ namespace DeepseaOil.Data
             }
         }
 
-        /// <summary>取第 pos 档（1-based），越界夹第 1 档并报 Warning</summary>
+        /// <summary>取第 pos 档（1-based）</summary>
         public TileEffectValue GetEffect(int pos)
         {
             return GetEffect(pos, out _);
         }
 
-        /// <summary>取第 pos 档（1-based）；inRange=false=夹取后兜底值</summary>
+        /// <summary>inRange=false=夹取后兜底值</summary>
         public TileEffectValue GetEffect(int pos, out bool inRange)
         {
             int count = LevelCount;
@@ -55,14 +55,14 @@ namespace DeepseaOil.Data
 
             if (count == 0)
             {
-                // value1 一档都没有=这行还没填，给 default 表示效果不存在
+                // value1 无条目=这行还没填，返回 default
                 return default;
             }
 
             return Build(index);
         }
 
-        /// <summary>取第 index 档（0-based，调用方保证在范围内）</summary>
+        /// <summary>index 0-based，调用方保证在范围内</summary>
         private TileEffectValue Build(int index)
         {
             float v1 = Value(_row.Value1, index);
@@ -95,13 +95,13 @@ namespace DeepseaOil.Data
                 case TileEffectType.ClearPlant:
                     return TileEffectValue.ClearPlants((int)v1);
 
-                // None / Skid / Block / Fixed：本轮不做，保留表行，解析成无效果
+                // None/Skid/Block/Fixed 保留表行，解析成无效果
                 default:
                     return default;
             }
         }
 
-        /// <summary>取第 index 项；该列没写到这一档时沿用最后一档（返回 0 会让 DoT 间隔变成"每帧一次"）</summary>
+        /// <summary>该列没写到这一档时沿用最后一档（返回 0 会让 DoT 间隔变成每帧一次）</summary>
         private static float Value(IReadOnlyList<float> values, int index)
         {
             if (values == null || values.Count == 0 || index < 0) return 0f;

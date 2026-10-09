@@ -13,18 +13,14 @@ using cfg.dso;
 
 namespace DeepseaOil.Presentation.Diagnostics
 {
-    /// <summary>战斗木桩与受击测试器：一只站着不动的敌人 ＋ 五个不同来源的受击入口，逐条验"扣耐久 / 减速 / 击退 / 碎裂 / 格上减速"</summary>
-    /// <remarks>
-    /// 自愈装配：ConfigModule / AssetModule / GameRoot / GameState 与格子系统，缺哪补哪；场景里没有敌人就按约定预制体实例化一只（缺预制体只报错，不拼白模）。
-    /// 驱动不走 Update / FixedUpdate：实现 ISceneRoot ＋ IRenderTicked / IPhysicsTicked 交给 GameRoot（唯一驱动入口）。
-    /// 与 CombatRoot 同场时不再自己驱动木桩与格子（避免一帧两次扣血），木桩也交给 CombatDirector。
-    /// </remarks>
+    /// <summary>战斗木桩与受击测试器：站桩敌人 ＋ 六个受击入口，逐条验"扣耐久 / 减速 / 击退 / 碎裂 / 格上减速"</summary>
+    /// <remarks>自愈装配配置 / 资源 / GameRoot / 格子系统，缺哪补哪；驱动经 ISceneRoot 交 GameRoot（唯一驱动入口），与 CombatRoot 同场时不重复驱动木桩与格子；缺预制体只报错，不拼白模。</remarks>
     public sealed class CombatDummyHarness : MonoBehaviour, ISceneRoot, IPhysicsTicked, IRenderTicked
     {
-        /// <summary>世界侧：格子与木桩都在玩家之后推进</summary>
+        /// 世界侧：格子与木桩在玩家之后推进
         public int Order => SceneOrder.World;
 
-        /// <summary>预制体找不到后的重试间隔（秒）</summary>
+        /// 预制体找不到后的重试间隔（秒）
         private const float PrefabRetryInterval = 2f;
 
         [Tooltip("木桩。场景里摆了敌人预制体实例就拖进来；留空则按 enemies/Enemy_{id} 约定实例化一只。")]
@@ -42,16 +38,16 @@ namespace DeepseaOil.Presentation.Diagnostics
         [Tooltip("面板放大倍数（相对 IMGUI 默认 12px 字号）。实际倍数还会按屏幕收口，保证面板不过屏幕中线；0/负数按 2 倍兜底。")]
         [SerializeField] private float guiScale = 2f;
 
-        /// <summary>本类是否自己握了格子系统（false = 复用 CombatRoot 的）</summary>
+        /// 是否自持格子系统（false = 复用 CombatRoot 的）
         private bool _ownsGrid;
 
-        /// <summary>是否已经装配过（ISceneRoot.Attach 必须幂等）</summary>
+        /// 是否已装配过（Attach 必须幂等）
         private bool _attached;
 
-        /// <summary>本类是否自己订阅了状态变化事件</summary>
+        /// 是否已订阅状态变化事件
         private bool _attachedAdapter;
 
-        /// <summary>木桩是否由本类逐物理帧推进（有 CombatDirector 时归它）</summary>
+        /// 木桩是否由本类逐物理帧推进（有 CombatDirector 时归它）
         private bool _drivesEnemy;
 
         private GridLogic _grid;
@@ -59,21 +55,21 @@ namespace DeepseaOil.Presentation.Diagnostics
 
         private GameRoot _root;
 
-        /// <summary>最近一次操作的可见反馈（面板与 Console 各一份）</summary>
+        /// 最近一次操作反馈（面板与 Console 各一份）
         private string _lastAction = "(还没有操作)";
 
-        /// <summary>致死碎裂后木桩计数，面板上显示"第几只"</summary>
+        /// 木桩计数，面板显示"第几只"
         private int _dummySerial;
 
-        /// <summary>预制体装配失败后的下次寻址时刻；逐物理帧重试会把 Console 刷满，反而盖住别的日志</summary>
+        /// 装配失败后的下次重试时刻（逐物理帧重试会刷满 Console）
         private float _prefabRetryAt;
 
-        /// <summary>上一只木桩的减速倍率 / 耐久读数：只在变化时报一行，验收靠它看"移速被减半"与"耐久跳字"</summary>
+        /// 上次上报的减速倍率与耐久（只在变化时报一行，验收看"移速被减半"）
         private float _reportedSlow = 1f;
 
         private int _reportedHp = -1;
 
-        /// <summary>当前这只木桩的表定移速，报读数用（GetEnemy 会现场造 Spec，别每帧调）</summary>
+        /// 当前木桩的表定移速，报读数用（GetEnemy 会造 Spec，别每帧调）
         private float _spawnMaxSpeed = 1f;
 
         private void Start()
@@ -86,7 +82,7 @@ namespace DeepseaOil.Presentation.Diagnostics
                 return;
             }
 
-            // 木桩被格子结算时，追踪开关有助于看清是哪条规则/效果打上来的。
+            // 开 Logic 层 [Reaction] 追踪，看是哪条规则/效果打的
             ReactionResolver.TraceEnabled = true;
 
             _root = GameRoot.Instance;
@@ -100,7 +96,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (_attachedAdapter && adapter != null) adapter.Detach();
         }
 
-        /// <summary>自愈装配：配置 → 资源 → GameRoot → 运行态</summary>
+        /// 自愈装配：配置 → 资源 → GameRoot → 运行态
         private void EnsureRuntime()
         {
             if (!ConfigModule.IsReady) ConfigModule.InitFromStreamingAssets();
@@ -111,7 +107,6 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             if (!ConfigModule.AreAssetsBound) ConfigModule.BindAssets();
 
-            // GameRoot 默认停在 Menu（暂停 ⇒ Time.deltaTime 为 0，击退与减速都不动）
             if (root.Game != null && root.Game.CurState != GameState.Running)
             {
                 root.Game.ChangeState(GameState.Running);
@@ -120,7 +115,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             }
         }
 
-        /// <summary>GameRoot 在第一个被驱动的帧调一次（幂等）</summary>
+        /// GameRoot 首个被驱动的帧调一次（幂等）
         public void Attach()
         {
             if (_attached) return;
@@ -135,19 +130,18 @@ namespace DeepseaOil.Presentation.Diagnostics
             }
             else
             {
-                // 格子归 CombatRoot 推进，本类不重复 Tick（一帧两次 DoT 会翻倍）
                 _ownsGrid = false;
 
                 Debug.Log("[Harness] 检测到 CombatRoot：格子交给它推进，本类只驱动木桩与发受击指令。");
             }
 
-            // 木桩不是 CombatDirector 刷出来的（它是场景件或本类自建），故永远由本类逐物理帧推进
+            // 木桩非 CombatDirector 所刷，永远由本类逐物理帧推进
             _drivesEnemy = true;
 
             EnsureDummy();
         }
 
-        /// <summary>本地装一套最小运行时：元素层 ＋ 格子层，登记地板格（只为"格上效果"这条链）</summary>
+        /// 本地最小运行时：元素层 ＋ 格子层，登记地板格（只为"格上效果"链）
         private void BuildLocalGrid()
         {
             if (adapter == null || !adapter.IsWired)
@@ -180,7 +174,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Debug.Log($"[Harness] 本地装配最小运行时：登记地板 {cells} 格（格上效果生效的前提）。");
         }
 
-        /// <summary>状态工厂：与 CombatRoot 同一套表驱动实现</summary>
+        /// 状态工厂：与 CombatRoot 同一套表驱动实现
         private static ITileState CreateTileState(TileStateType id)
         {
             TileStateSpec spec = ConfigModule.TryGetTileState(id);
@@ -210,7 +204,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             ReportReadouts(dummy);
         }
 
-        /// <summary>减速倍率与耐久的变化才报，逐帧报会把 Console 刷爆（验收要看到的正是这两行读数）</summary>
+        /// 减速倍率与耐久变化才报，逐帧报会刷爆 Console
         private void ReportReadouts(EnemyActor dummy)
         {
             float slow = dummy.SlowMultiplier;
@@ -231,8 +225,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Debug.Log($"[Harness] 木桩耐久：{dummy.Hp}（存活 {dummy.IsAlive}）");
         }
 
-        /// <summary>木桩在不在；不在（首次装配 / 上一只刚碎裂）就按约定预制体补一只</summary>
-        /// <remarks>不再现场拼白模：敌人长什么样是预制体的事，缺件只报错不兜底。</remarks>
+        /// 木桩不在（首次装配 / 刚碎裂）就按约定预制体补一只
         private EnemyActor EnsureDummy()
         {
             if (enemy == null) enemy = SpawnFromPrefab();
@@ -263,8 +256,8 @@ namespace DeepseaOil.Presentation.Diagnostics
             return enemy;
         }
 
-        /// <summary>按种类 id 寻址 enemies/Enemy_{id} 并实例化；找不到就报错返回 null（不静默自愈）</summary>
-        /// <remarks>失败后退避 <see cref="PrefabRetryInterval"/> 秒再试：本方法由逐物理帧的 FixedTick 调，不退避就是每秒 60 条同样的报错。</remarks>
+        /// 按 id 寻址 enemies/Enemy_{id} 实例化；找不到就报错返回 null
+        /// <remarks>失败后退避 PrefabRetryInterval 秒再试：本方法由逐物理帧的 FixedTick 调，不退避就是每秒 60 条同样报错。</remarks>
         private EnemyActor SpawnFromPrefab()
         {
             if (Time.time < _prefabRetryAt) return null;
@@ -305,7 +298,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             return actor;
         }
 
-        /// <summary>面板外的六个入口都对应一个按键：1 单次受击 / 2 减速 / 3 击退 / 4 致死 / 5 脚下刷泥 / 6 脚下点燃</summary>
+        /// 六个入口各对应一键：1 单次受击 / 2 减速 / 3 击退 / 4 致死 / 5 脚下刷泥 / 6 脚下点燃
         private void PollKeys()
         {
             Keyboard keyboard = Keyboard.current;
@@ -320,7 +313,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (keyboard.digit6Key.wasPressedThisFrame) CutTileUnderfoot(TileStateType.Burn, "燃烧");
         }
 
-        /// <summary>[1] 单次受击：验扣耐久与头顶数字</summary>
+        /// [1] 单次受击：验扣耐久与头顶数字
         private void HitOnce()
         {
             EnemyActor dummy = EnsureDummy();
@@ -334,7 +327,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Report($"单次受击 1 点 → 耐久 {dummy.Hp}（存活 {dummy.IsAlive}）");
         }
 
-        /// <summary>[2] 减速：验变色（观感取 VisualPalette 的减速色）</summary>
+        /// [2] 减速：验变色（观感取 VisualPalette 减速色）
         private void Slow()
         {
             EnemyActor dummy = EnsureDummy();
@@ -346,7 +339,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Report("施加减速 0.5× / 3s → 身体应转减速色");
         }
 
-        /// <summary>[3] 击退：验冲量滑停</summary>
+        /// [3] 击退：验冲量滑停
         private void Knockback()
         {
             EnemyActor dummy = EnsureDummy();
@@ -358,7 +351,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Report("施加击退 up × 8 → 应被推走再滑停");
         }
 
-        /// <summary>[4] 致死：验死亡与 Shatter 碎片粒子</summary>
+        /// [4] 致死：验死亡与 Shatter 碎片粒子
         private void Kill()
         {
             EnemyActor dummy = EnsureDummy();
@@ -372,7 +365,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Report("致死 999 点 → 木桩碎裂（Shatter）；再按任意键会自动补一只");
         }
 
-        /// <summary>[5]/[6] 脚下改地块：把木桩当前所站格切成目标状态，验"格上减速 / 格上掉血"</summary>
+        /// [5]/[6] 把木桩所站格切成目标状态，验"格上减速 / 格上掉血"
         private void CutTileUnderfoot(TileStateType state, string label)
         {
             EnemyActor dummy = EnsureDummy();
@@ -407,7 +400,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             Matrix4x4 saved = GUI.matrix;
             float scale = HarnessGui.Scale(guiScale, panelSize);
 
-            // 整体缩放：控件坐标仍按设计值写，屏幕占位与字号一起放大（倍数按屏幕收口，见 HarnessGui）
+            // 整体缩放：控件坐标按设计值写，屏幕占位与字号一起放大（倍数按屏幕收口，见 HarnessGui）
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
             GUILayout.BeginArea(new Rect(panelOrigin.x, panelOrigin.y, panelSize.x, panelSize.y), GUI.skin.box);

@@ -9,8 +9,8 @@ using cfg.dso;
 
 namespace DeepseaOil.Presentation.Adapters
 {
-    /// <summary>格子系统与 Unity Tilemap 的适配器，把地板格子与几何灌进逻辑层，把状态变化画出来</summary>
-    /// <remarks>本文件是唯一认识 Tilemap 的地方，逻辑层零引擎类型，几何折算只在这里发生。订阅时机由组合根收口（Attach/Detach），不自己 OnEnable 订阅。地板层提供格集合与几何，效果层盖状态贴图。效果贴图不改地板，否则分不清"本来是泥"还是"被打成泥"。状态 → 贴图先查 stateTiles（特例覆盖），未配的按 `tiles/Tile_{状态}` 约定懒加载；新增状态把贴图放进约定路径即可，Inspector 不必再加行。</remarks>
+    /// 格子系统与 Tilemap 的适配器：地板与几何进逻辑层，状态画出来
+    /// 唯一认识 Tilemap 的地方；订阅由组合根收口（Attach/Detach）。效果贴图只盖状态、不改地板；状态→贴图先查 stateTiles，未配的按约定懒加载。
     public sealed class TilemapAdapter : MonoBehaviour
     {
         [Serializable]
@@ -35,20 +35,18 @@ namespace DeepseaOil.Presentation.Adapters
         [Tooltip("初始地块编辑层（可选）：用笔刷在此绘制开局特殊地块。读取后自动隐藏")]
         [SerializeField] private Tilemap initialSetupTilemap = default;
 
-        /// <remarks>只记第一次覆盖，否则第二次覆盖会把"泥浆"当原值，这一格永远回不到原样且不报错。前提：效果层只有 Show/Restore 两个写者，别处改动会被还原盖掉；effectTilemap 被换掉时旧记录会贴到新层上。原值取自 effectTilemap，拿地板图还原会抹掉效果层装饰。</remarks>
+        /// 只记第一次覆盖（第二次会把"泥浆"当原值）；原值取自 effectTilemap，效果层只有 Show/Restore 写者。
         private readonly Dictionary<Vector3Int, TileBase> _previousTiles = new();
 
-        /// <summary>懒加载到的状态贴图，状态 → 贴图</summary>
-        /// <remarks>存在的理由：TileFor 在"格子状态变了"的热路径上（战斗里成片变泥），每次寻址都会走一遍资源系统。这里只缓存**取到过**的贴图：未配置的状态在 stateTiles 里已有特例覆盖，不进这张表，字典保持很小。</remarks>
+        /// 热路径缓存：只缓存取到过的贴图，避免反复寻址资源系统。
         private readonly Dictionary<TileStateType, TileBase> _runtimeTileCache = new();
 
-        /// <summary>InitialSetup 层首次载入的结果，-1 = 还没载入</summary>
-        /// <remarks>读完那层会被 SetActive(false)，再扫一遍既拿不到数据（Tilemap 不保证对非激活对象可见）也会让调用方以为"这次读到 0"。</remarks>
+        /// -1 = 还没载入；读完该层会被 SetActive(false)。
         private int _initialSetupLoaded = -1;
 
         public bool IsWired => groundTilemap != null;
 
-        /// <summary>开始听"格子状态变了"，必须在灌入初始状态之前调，否则那批初始泥浆不会被画出来</summary>
+        /// 开始听格子状态变化，必须在灌入初始状态之前调。
         public void Attach()
         {
             EventBus<TileStateChanged>.Subscribe(OnTileStateChanged);
@@ -59,8 +57,7 @@ namespace DeepseaOil.Presentation.Adapters
             EventBus<TileStateChanged>.Unsubscribe(OnTileStateChanged);
         }
 
-        /// <summary>读一次格子几何</summary>
-        /// <remarks>角点语义必须与 GridGeometry 对齐：CellToWorld(zero) 是格 (0,0) 左下角、GetCellCenterWorld(zero) 是格心，差半格，用错会让全场落点整体偏半格且难倒推，故对齐后自检一次并报错。</remarks>
+        /// 角点语义与 GridGeometry 对齐：CellToWorld(zero)=格左下角、GetCellCenterWorld(zero)=格心，差半格。
         public GridGeometry ReadGeometry()
         {
             if (groundTilemap == null) return default;
@@ -83,7 +80,7 @@ namespace DeepseaOil.Presentation.Adapters
             return geometry;
         }
 
-        /// <summary>把地板层全部格子登记进逻辑层，只有登记过的格才能被砸出状态、被减速</summary>
+        /// 把地板层全部格子登记进逻辑层，只有登记过的格才能被砸出状态、被减速
         public int RegisterCells(GridLogic grid)
         {
             if (grid == null || groundTilemap == null) return 0;
@@ -110,14 +107,8 @@ namespace DeepseaOil.Presentation.Adapters
             return count;
         }
 
-        /// <summary>把 InitialSetup 编辑层上刷出来的地块读进逻辑层（含开局状态），读完当场关掉该层，返回真正切了状态的格数</summary>
-        /// <remarks>
-        /// 关卡设计的入口：策划在编辑器里用笔刷画"开局就有的火池／冰面／植物"，不再手填 tile_initial.xlsx。
-        /// 调用时机必须在 Attach() 之后：那批初始泥浆靠 TileStateChanged 事件画到效果层上，订阅晚一步就只能看见逻辑没有贴图。
-        /// 本层只在编辑器里有意义，运行时 SetActive(false) 掉，省掉一次多余的 Tilemap 渲染。
-        /// 读一次就够：第二次调用直接返回首次结果，不重扫也不重复报日志（同一场景里可能有两个驱动器各调一次）。
-        /// 返回 0 有两种含义：这层没接线／没刷东西（调用方据此退回表驱动），或刷的恰好全是 Normal。
-        /// </remarks>
+        /// 读 InitialSetup 层刷的地块进逻辑层，读完关掉该层，返回切了状态的格数
+        /// 策划用笔刷画开局地块的入口（替代 tile_initial.xlsx）；必须在 Attach() 之后调；重复调用返回首次结果；返回 0 = 没接线或全是 Normal。
         public int LoadInitialSetupTiles(GridLogic grid)
         {
             if (initialSetupTilemap == null || grid == null) return 0;
@@ -154,7 +145,7 @@ namespace DeepseaOil.Presentation.Adapters
 
             _initialSetupLoaded = count;
 
-            // 读完立刻关层：初始地块只是编辑期的输入，留着会白吃一次 Tilemap 渲染
+            // 关层：初始地块只是编辑期输入，留着白吃一次渲染
             initialSetupTilemap.gameObject.SetActive(false);
 
             Debug.Log($"[Grid] 从 InitialSetup 层成功载入 {count} 个初始特殊地块。");
@@ -162,14 +153,8 @@ namespace DeepseaOil.Presentation.Adapters
             return count;
         }
 
-        /// <summary>InitialSetup 层的贴图 → 状态：先查 stateTiles 特例覆盖，未命中再按 Tile_&lt;状态&gt; 资产名兜底</summary>
-        /// <remarks>
-        /// 通道②是两条：先剥 <c>Tile_</c> 前缀再解析，失败后拿资产全名再解析一次。
-        /// 两条都要，且顺序不能换 —— Unity 里 <c>Object.name</c> 是资产内部的 m_Name（本工程的 <c>tiles/Tile_Mud.asset</c> 名字就是 <c>Mud</c>，文件名前缀不算），
-        /// 所以"文件名带 Tile_ 前缀"这套约定对现有美术件并不成立；只留剥离一条，笔刷刷上去的泥浆会静默落回 Normal（实测过）。
-        /// 反过来，资产全名等于 <c>Tile_Mud</c> 时第一条命中，第二条根本不会跑，故对按约定命名的贴图毫无影响。
-        /// 解析不出来时不能静默当 Normal：那格会静默地什么都没发生，而策划只会看见"我刷了但没生效"。
-        /// </remarks>
+        /// InitialSetup 贴图 → 状态：先查 stateTiles，未命中按资产名解析
+        /// 顺序不能换：先剥 Tile_ 前缀，失败再用资产全名（Object.name 是资产 m_Name）。
         private TileStateType ResolveSetupState(TileBase tile)
         {
             if (stateTiles != null)
@@ -221,7 +206,7 @@ namespace DeepseaOil.Presentation.Adapters
                     "（表现为地上出现一块空洞）。请用两层不同的 Tilemap。", this);
             }
 
-            // InitialSetup 读完会被 SetActive(false)：指错层等于开局把地板或效果层关掉，而且现象离病因很远
+            // InitialSetup 读完会 SetActive(false)，指错层会误关地板/效果层
             if (initialSetupTilemap != null && (initialSetupTilemap == groundTilemap || initialSetupTilemap == effectTilemap))
             {
                 Debug.LogError(
@@ -233,18 +218,18 @@ namespace DeepseaOil.Presentation.Adapters
         }
 
 #if UNITY_EDITOR
-        /// <remarks>接线属于一眼可查的错，不该等进 Play 才发现，这里也跑一遍自检。只读 stateTiles 并打日志，不写序列化字段；幂等，重复跑不改变状态。</remarks>
+        /// 接线错在编辑器内就报，不等进 Play；只读 stateTiles。
         private void OnValidate()
         {
             ValidateStateTiles();
         }
 #endif
 
-        /// <summary>校验 stateTiles 这张特例表：Normal 与重复状态都必须报出来</summary>
-        /// <remarks>两条都不报错也能跑但一定画错：Normal 在 OnTileStateChanged 里当擦除，绑贴图自相矛盾，真正想画的状态反而查不到贴图；重复状态只取第一条命中，后面的静默失效。行内贴图留空是**合法**的（= 该状态不上贴图）。</remarks>
+        /// 校验 stateTiles：Normal 与重复状态必须报出来
+        /// Normal 在事件里当擦除；重复状态只取第一条
         private void ValidateStateTiles()
         {
-            // 空表是合法配置（= 全部走 `tiles/Tile_<状态>` 约定），不是接线错误：不报日志，取不到贴图时由 TileFor 单独出声。
+            // 空表合法（全走 tiles/Tile_{状态}），故不报日志
             if (stateTiles == null || stateTiles.Length == 0) return;
 
             for (int i = 0; i < stateTiles.Length; i++)
@@ -287,13 +272,8 @@ namespace DeepseaOil.Presentation.Adapters
             Show(evt.Cell, TileFor(evt.State));
         }
 
-        /// <summary>状态 → 效果层贴图：Inspector 特例优先，未配置的按约定懒加载</summary>
-        /// <remarks>
-        /// 三级顺序不能换：① stateTiles 是策划／美术的特例覆盖（同一状态换皮、临时占位都靠它）；
-        /// ② 运行期缓存让热路径只查一次字典，不反复寻址；③ 没配过才按 `tiles/Tile_{状态}` 约定取，
-        /// 因此新增地块状态**不需要动 Inspector**，也就不存在"忘了配一行、泥浆静默不显示"。
-        /// 取不到只报一条警告并返回 null：渲染链上抛异常会打断整批还画得出来的格子。
-        /// </remarks>
+        /// 状态 → 效果层贴图：特例优先，未配的按约定懒加载
+        /// 顺序：stateTiles 特例 → 缓存 → tiles/Tile_{状态}；取不到只警告一次并返回 null。
         private TileBase TileFor(TileStateType state)
         {
             if (stateTiles != null)
@@ -302,7 +282,7 @@ namespace DeepseaOil.Presentation.Adapters
                 {
                     if (stateTiles[i].State != state) continue;
 
-                    // 绑了状态但贴图留空 = 明确要求"逻辑生效但不显示"，不再走约定去猜
+                    // 绑了状态但贴图留空 = 明确要求逻辑生效但不显示
                     if (stateTiles[i].Tile == null) return null;
 
                     return stateTiles[i].Tile;
@@ -311,8 +291,7 @@ namespace DeepseaOil.Presentation.Adapters
 
             if (_runtimeTileCache.TryGetValue(state, out TileBase cached)) return cached;
 
-            // 资源系统没起来时不去寻址（BuildSettings 里单开这个场景调试时会出现），
-            // 否则每次状态变化都会从 AssetModule 抛一条 InvalidOperationException 打断渲染
+            // 资源系统没起来时不寻址，否则每次状态变化都抛异常
             if (!AssetModule.IsInitialized) return null;
 
             string key = $"tiles/Tile_{state}";

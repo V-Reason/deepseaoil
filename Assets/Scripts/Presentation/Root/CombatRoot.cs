@@ -18,11 +18,11 @@ using cfg.dso;
 
 namespace DeepseaOil.Presentation
 {
-    /// <summary>战斗切片的组合根：装配一次，每帧驱动</summary>
-    /// <remarks>无 Update/FixedUpdate，GameRoot 调 RenderTick 与 FixedTick：渲染帧=格子→球→喷泉，物理帧=冲量→敌人→玩家受击</remarks>
+    /// 战斗切片的组合根：装配一次，每帧驱动
+    /// 无 Update/FixedUpdate，GameRoot 调 RenderTick 与 FixedTick：渲染帧=格子→球→落物→喷泉，物理帧=冲量→敌人→玩家受击
     public sealed class CombatRoot : MonoBehaviour, ISceneRoot, IRenderTicked, IPhysicsTicked, IThrowSink
     {
-        /// <summary>世界侧排在玩家侧之后</summary>
+        /// 世界侧排在玩家侧之后
         public int Order => SceneOrder.World;
 
         [Header("必需接线")]
@@ -107,7 +107,7 @@ namespace DeepseaOil.Presentation
         {
             if (!IsReady) return;
 
-            // 顺序：格子先跑（泥浆可能本帧到期），再推球（落地改格加冲量），最后喷泉
+            // 顺序：格子先跑（泥浆可能本帧到期），再推球（落地改格加冲量）与落物，最后喷泉
             _grid.Tick(Time.time, deltaTime);
 
             _balls.Tick(deltaTime);
@@ -138,8 +138,8 @@ namespace DeepseaOil.Presentation
             UpdatePlayerContact(now);
         }
 
-        /// <summary>世界侧两件玩家相关裁决：谁打到玩家、打空怎么重来</summary>
-        /// <remarks>判定是纯函数（ContactProbe.TryFindAttacker），可在 EditMode 测。世界→玩家只走通知：组装 Damage 经 PlayerLogic.TakeDamage，扣血/无敌/推多远由玩家侧定</remarks>
+        /// 世界侧两件玩家相关裁决：谁打到玩家、打空怎么重来
+        /// 判定是纯函数（ContactProbe.TryFindAttacker），可在 EditMode 测。世界→玩家只走通知：组装 Damage 经 PlayerLogic.TakeDamage，扣血/无敌/推多远由玩家侧定
         private void UpdatePlayerContact(float now)
         {
             PlayerLogic logic = player != null ? player.Logic : null;
@@ -205,8 +205,8 @@ namespace DeepseaOil.Presentation
             _drops?.ClearAll();
         }
 
-        /// <summary>裁决投掷请求（IThrowSink）：落点合法性属世界信息</summary>
-        /// <remarks>唯一否决判据：落点格没有地板（GridLogic.HasCell）。将来的阻挡/占位物加在这里，玩家侧不用改</remarks>
+        /// 裁决投掷请求（IThrowSink）：落点合法性属世界信息
+        /// 唯一否决判据：落点格没有地板（GridLogic.HasCell）；将来的阻挡/占位物加在这里，玩家侧不用改
         public bool RequestThrow(in ThrowIntent intent)
         {
             if (!IsReady) return false;
@@ -216,7 +216,7 @@ namespace DeepseaOil.Presentation
             return _balls != null && _balls.Throw(in intent);
         }
 
-        /// <summary>组装战斗切片：依赖全来自参数与 Data 层（无 FindObjectOfType 与 Inspector 数值），射程取 PlayerSpec.MaxThrowDistance</summary>
+        /// 组装战斗切片：依赖全来自参数与 Data 层（无 FindObjectOfType 与 Inspector 数值），射程取 PlayerSpec.MaxThrowDistance
         private void Assemble()
         {
             if (player == null || gridView == null)
@@ -311,8 +311,8 @@ namespace DeepseaOil.Presentation
                     : "敌人 关闭（CombatRoot 的「是否刷敌人」未勾选：想要刷怪请在 Inspector 上勾上它）"));
         }
 
-        /// <summary>状态工厂：给 ID 造新实例，null=该 ID 没有实现</summary>
-        /// <remarks>不共享原型：状态自己记持续时长，否则全场共用一个计时器。所有状态共用表驱动实现 TableTileState，只读 TileStateSpec，规则表命中的状态与有实现的状态同一集合；配置里没有那一行才返回 null</remarks>
+        /// 状态工厂：给 ID 造新实例，null=该 ID 没有实现
+        /// 不共享原型：状态自己记持续时长，否则全场共用一个计时器；所有状态共用表驱动实现 TableTileState，只读 TileStateSpec，规则表命中的状态与有实现的状态同一集合，配置里没有那一行才返回 null
         private static ITileState CreateTileState(TileStateType id)
         {
             TileStateSpec spec = ConfigModule.TryGetTileState(id);
@@ -354,8 +354,8 @@ namespace DeepseaOil.Presentation
             return director;
         }
 
-        /// <summary>掉落物被领取：世界→玩家通知，按种类裁决给什么</summary>
-        /// <remarks>裁决在这里而不在掉落物里（掉落物只发事实）；加一种掉落物在这里加 case，玩家侧不用改</remarks>
+        /// 掉落物被领取：世界→玩家通知，按种类裁决给什么
+        /// 裁决在这里而不在掉落物里（掉落物只发事实）；加一种掉落物在这里加 case，玩家侧不用改
         private void OnDropCollected(DropCollected evt)
         {
             switch (evt.Type)
@@ -371,7 +371,7 @@ namespace DeepseaOil.Presentation
             }
         }
 
-        /// <summary>HUD 加载完成时重播：三块读数各播一次当前值</summary>
+        /// HUD 加载完成时重播：三块读数各播一次当前值
         private void OnRequestHudRefresh(RequestHudRefresh evt)
         {
             player?.Logic?.Stats.Announce();

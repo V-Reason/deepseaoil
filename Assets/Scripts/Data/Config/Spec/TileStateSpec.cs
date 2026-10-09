@@ -12,7 +12,6 @@ namespace DeepseaOil.Data
         /// <summary>已解析的效果清单，effects 与 effectValuePos 逐条配对、档位已选定</summary>
         public readonly IReadOnlyList<TileEffectValue> EnterEffects;
 
-        /// <summary>row=表行</summary>
         /// <remarks>resolve=取"某效果第 pos 档"的解析器，null 时效果清单退化成"全是 None"（逻辑层单跑测试）</remarks>
         public TileStateSpec(TileState row, ElementRuleSpec.EffectResolver resolve = null)
         {
@@ -46,7 +45,7 @@ namespace DeepseaOil.Data
         /// <summary>持续时间（秒），&lt;=0=永久（只能被别的状态顶掉）</summary>
         public float Duration => _row.Duration;
 
-        /// <summary>是否把自身传播给相邻格；本轮只读不做，恒为 false（表已删掉这一列）</summary>
+        /// <summary>恒为 false（表已删掉这一列）</summary>
         public bool WillSpread => false;
 
         /// <summary>是否参与元素反应；本轮只读</summary>

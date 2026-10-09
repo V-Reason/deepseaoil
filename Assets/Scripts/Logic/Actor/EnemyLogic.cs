@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace DeepseaOil.Logic
 {
-    /// <summary>敌人逻辑层：账本＋状态层＋移动层＋大脑，同构玩家，输入来自 IEnemyBrain；帧序见 ActorLogic</summary>
+    /// <summary>敌人逻辑层：账本＋状态层＋移动层＋大脑</summary>
     public sealed class EnemyLogic : ActorLogic
     {
         private readonly StatusGroup _status;
@@ -13,7 +13,7 @@ namespace DeepseaOil.Logic
 
         private Vector2? _target;
 
-        /// <remarks>冲量必须挂起，不能当场写账本：账本在帧首清累积区，两次 Tick 之间写会被下一固定帧清掉；格子结算在渲染帧而敌人 Tick 在物理帧，现象是打中却不动且不报错</remarks>
+        /// <remarks>冲量必须挂起，不能当场写账本：账本在帧首清累积区，两次 Tick 之间写会被下一固定帧清掉</remarks>
         private Vector2 _pendingKnockback;
 
         public EnemyLogic(IActorMotor motor, EnemySpec spec)
@@ -21,7 +21,7 @@ namespace DeepseaOil.Logic
         {
         }
 
-        /// <summary>注入大脑：换策略不必改本类；brain=null 按 spec 造默认</summary>
+        /// <summary>注入大脑；brain=null 按 spec 造默认</summary>
         public EnemyLogic(IActorMotor motor, EnemySpec spec, IEnemyBrain brain)
             : base(motor, spec.Config)
         {
@@ -30,10 +30,9 @@ namespace DeepseaOil.Logic
             _move = new EnemyMoveGroup(this, motor);
         }
 
-        /// <summary>行为决策者；只认接口，具体策略由装配方决定</summary>
         public IEnemyBrain Brain { get; }
 
-        /// <summary>本帧意图，由 Brain.Decide 产出；状态层唯一读口（不直接问大脑，换策略不动状态机）</summary>
+        /// <summary>本帧意图，由 Brain.Decide 产出；状态层唯一读口</summary>
         public EnemyIntent Intent { get; private set; }
 
         public StatusGroup Status => _status;
@@ -47,7 +46,6 @@ namespace DeepseaOil.Logic
             _target = target;
         }
 
-        /// <remarks>帧内多次调用累加</remarks>
         public void ApplyKnockback(float impulse, Vector2 direction)
         {
             if (impulse <= 0f) return;

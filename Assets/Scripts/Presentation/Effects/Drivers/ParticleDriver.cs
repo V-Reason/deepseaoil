@@ -5,13 +5,7 @@ using UnityEngine;
 namespace DeepseaOil.Presentation.Effects.Drivers
 {
     /// <summary>粒子驱动，管理一个 EffectId 对应粒子预制体的播放、回收与池化</summary>
-    /// <remarks>
-    /// 单例型重复 Play 合并到当前实例（取最大强度、不重置计时），多实例型每次新建。
-    /// 回收：先按估算时长计时，到点才问一次 IsAlive(false)，再超 +5s 强制回收。
-    /// 强度乘数属于作者，须存下来只做相对缩放，见 _authoredSizeMul。
-    /// 池满走 CreateOrDrop，丢弃请求并节流警告，不用 DropSilently（未预热时会连第一次 Play 一起丢）。
-    /// 位置写世界坐标并保留预制体自带 z，缩放 = 预制体缩放 × ctx.Scale，不按 ctx.Direction 旋转。
-    /// </remarks>
+    /// <remarks>单例型重复 Play 合并到当前实例（取最大强度、不重置计时），多实例型每次新建。回收：按估算时长计时，到点问一次 IsAlive(false)，超 +5s 强制回收。强度乘数属作者，须存下来只做相对缩放，见 _authoredSizeMul。池满走 CreateOrDrop，丢弃并节流警告，不用 DropSilently（未预热时会连第一次 Play 一起丢）。位置写世界坐标并保留预制体自带 z，缩放 = 预制体缩放 × ctx.Scale，不按 ctx.Direction 旋转。</remarks>
     public sealed class ParticleDriver : IEffectDriver
     {
         /// <summary>Intensity=0 时粒子量与大小的缩放，相对预制体作者值，1 时原样播</summary>
@@ -306,10 +300,7 @@ namespace DeepseaOil.Presentation.Effects.Drivers
         }
 
         /// <summary>强度映射，按作者值相对缩放</summary>
-        /// <remarks>
-        /// 乘数属性对所有 MinMaxCurve 模式都合法，但属于作者：写 = k 会把它抹成 1；startSize.curveMultiplier 刻意不碰，两者相乘都乘 k 会变 k²。
-        /// 实例系统数与预制体不一致时宁可不缩放也不写坏作者值，只报一次警告。
-        /// </remarks>
+        /// <remarks>乘数属性对所有 MinMaxCurve 模式都合法，但属作者：写 = k 会抹成 1；startSize.curveMultiplier 刻意不碰，两者相乘都乘 k 会变 k²。实例系统数与预制体不一致时宁可不缩放也不写坏作者值，只报一次警告。</remarks>
         private void ApplyIntensity(ParticleSystem[] systems, float intensity)
         {
             float k = Mathf.Lerp(MinIntensityScale, 1f, Mathf.Clamp01(intensity));

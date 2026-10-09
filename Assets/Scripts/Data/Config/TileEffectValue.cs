@@ -80,11 +80,7 @@ namespace DeepseaOil.Data
         public int Radius => (int)_a;
 
         /// <summary>是不是"进格一下"的一次性效果：只该在进入那一刻生效</summary>
-        /// <remarks>
-        /// 判据是语义而非表里的 <c>flag</c> 列（那列至今无读取点，且 <c>瞬时伤害</c> 行的 level1 填的是 false，按它判会漏）。
-        /// 瞬时伤害 / 击退逐帧重放会变成"每秒 60 次掉血 / 每秒 60 次弹开"——实测冰沙站一秒掉 62 点。
-        /// 持续伤害（按 interval 攒拍）与减速 / 麻痹（续命）不属于这一类。
-        /// </remarks>
+        /// <remarks>判据是语义而非表里的 flag 列（该列至今无读取点，且瞬时伤害行的 level1 填 false，按它判会漏）；瞬时伤害/击退逐帧重放会变成每秒 60 次掉血/弹开，持续伤害（按 interval 攒拍）与减速/麻痹（续命）不属此类</remarks>
         public bool IsEnterOnly
             => Kind == TileEffectKind.InstantDamage || Kind == TileEffectKind.KnockBack;
 
@@ -95,35 +91,27 @@ namespace DeepseaOil.Data
 
         public float ConductivityRatio => _c;
 
-        /// <summary>构造减速效果</summary>
         public static TileEffectValue Slow(float scale, float seconds)
             => new TileEffectValue(TileEffectKind.Slow, scale, seconds, 0f);
 
-        /// <summary>构造瞬时伤害效果</summary>
         public static TileEffectValue InstantDamage(float amount)
             => new TileEffectValue(TileEffectKind.InstantDamage, amount, 0f, 0f);
 
-        /// <summary>构造击退效果</summary>
         public static TileEffectValue KnockBack(float cells)
             => new TileEffectValue(TileEffectKind.KnockBack, cells, 0f, 0f);
 
-        /// <summary>构造滑行效果</summary>
         public static TileEffectValue Slide(int cells, float seconds)
             => new TileEffectValue(TileEffectKind.Slide, cells, seconds, 0f);
 
-        /// <summary>构造麻痹效果</summary>
         public static TileEffectValue Numbness(float seconds)
             => new TileEffectValue(TileEffectKind.Numbness, seconds, 0f, 0f);
 
-        /// <summary>构造持续伤害效果</summary>
         public static TileEffectValue DamageOverTime(float perTick, float interval, float seconds)
             => new TileEffectValue(TileEffectKind.DamageOverTime, perTick, interval, seconds);
 
-        /// <summary>构造温湿度继承效果</summary>
         public static TileEffectValue InheritElement(float tempRatio, float wetRatio, float condRatio)
             => new TileEffectValue(TileEffectKind.InheritElement, tempRatio, wetRatio, condRatio);
 
-        /// <summary>构造清除植物效果</summary>
         public static TileEffectValue ClearPlants(int radius)
             => new TileEffectValue(TileEffectKind.ClearPlants, radius, 0f, 0f);
 

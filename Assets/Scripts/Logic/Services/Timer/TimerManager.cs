@@ -24,7 +24,6 @@ namespace DeepseaOil.Logic.Services
             _slotCount = slotCount;
         }
 
-        /// <summary>建两条时间轮</summary>
         public void Init()
         {
             _scaledWheel = new TimerWheel(_slotDuration, _slotCount);
@@ -36,8 +35,7 @@ namespace DeepseaOil.Logic.Services
         {
             if (_scaledWheel == null) return;
 
-            // 只有"游戏时间"也跳了才值得出声：编辑器域重载 / 资源导入 / 暂停恢复会让 unscaled 跳到几秒，
-            // 而 deltaTime 仍是正常帧长（Console 里恒成对出现 3.1s / 0.02s），逐次告警不可修且纯噪音。
+            // 仅当 deltaTime 也跳才告警：只有 unscaled 跳的是域重载/资源导入/暂停恢复，逐次告警纯噪音且刷 Console
             if (unscaledDeltaTime > 0.5f && deltaTime > 0.5f)
             {
                 Debug.LogWarning(
@@ -90,7 +88,7 @@ namespace DeepseaOil.Logic.Services
             _unscaledWheel?.Clear();
         }
 
-        /// <summary>拆除：清空两条轮（IService 收尾口）</summary>
+        // IService 收尾口
         public void Dispose()
         {
             Clear();
@@ -108,7 +106,6 @@ namespace DeepseaOil.Logic.Services
             return false;
         }
 
-        /// <summary>两轮登记 timer 总数（诊断用）</summary>
         public int Count => (_scaledWheel?.Count ?? 0) + (_unscaledWheel?.Count ?? 0);
     }
 }

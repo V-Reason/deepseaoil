@@ -33,7 +33,6 @@ namespace DeepseaOil.Presentation.UI
                     break;
 
                 case "BtnSetting":
-                    // GameRoot.Instance.Game.ChangeState(GameState.Paused);
                     break;
             }
         }
