@@ -5,24 +5,24 @@ using DeepseaOil.Logic.Grid;
 using DeepseaOil.Logic.Movement;
 using DeepseaOil.Presentation.Adapters;
 using DeepseaOil.Presentation.Effects;
-using DeepseaOil.Presentation.Primitive;
 using DeepseaOil.Presentation.Visual;
 using UnityEngine;
 
 namespace DeepseaOil.Presentation.Actor
 {
-    /// <summary>一只敌人：建刚体与视效、推进逻辑层、结算伤害与死亡，是这只敌人的组合根</summary>
-    /// <remarks>受伤只有一条路：TakeDamage。脚底中心每帧登记进 EnemyCellRegistry，格子按"人站在哪一格"结算。不自己驱动：由 CombatDirector 逐只 FixedTick，自驱会让帧内顺序不可预测。挂接口前先问是否一种独立能力。</remarks>
+    /// <summary>一只敌人：抓预制体上的执行器与视效、推进逻辑层、结算伤害与死亡，是这只敌人的组合根</summary>
+    /// <remarks>身体、碰撞体半径、渲染件、死亡特效全部由预制体决定（enemies/Enemy_{id}.prefab）：本类不 AddComponent、不建头顶数字、不认 Sprite 资源，缺件只报错不兜底。
+    /// 受伤只有一条路：TakeDamage。脚底中心每帧登记进 EnemyCellRegistry，格子按"人站在哪一格"结算。不自己驱动：由 CombatDirector 逐只 FixedTick，自驱会让帧内顺序不可预测。挂接口前先问是否一种独立能力。</remarks>
     [DisallowMultipleComponent]
     public sealed class EnemyActor : MonoBehaviour, IDamageable, ISlowable, IKnockBackable, IStunnable, IManagedActor
     {
-        private const float HpTextCharacterSize = 0.13f;
+        [Header("死亡反馈")]
+        [Tooltip("死亡时播放的特效；由预制体配置")]
+        [SerializeField] private EffectId deathEffect = EffectId.Shatter;
 
-        /// <summary>头顶数字垂直偏移，0=压在圆心（锚点 MiddleCenter）</summary>
-        private const float HpTextOffsetY = 0f;
-
-        /// <summary>内置字体候选名，新→旧排；旧名在 2022.3 抛 ArgumentException 而非返回 null，故逐个 try</summary>
-        private static readonly string[] BuiltinFontNames = { "LegacyRuntime.ttf", "Arial.ttf" };
+        [Header("临时调试件")]
+        [Tooltip("头顶耐久数字（预制体上的 Hp_txt 节点）。留空则自取子节点；这是可视化调试件，正式表现应做进预制体美术")]
+        [SerializeField] private TextMesh hpText = default;
 
         private EnemySpec _spec;
         private EnemyLogic _logic;
@@ -31,13 +31,18 @@ namespace DeepseaOil.Presentation.Actor
         /// <summary>视觉适配器，挂在子节点 View 上；Root 只承担物理真值与组合根</summary>
         private ActorAnimationView _animView;
 
-        private TextMesh _hpText;
+        /// <summary>身体渲染器（颜色与排序的唯一写入口），来自预制体 View 上的 SpriteRenderer</summary>
+        private SpriteRenderer _body;
+
         private Transform _target;
         private GridLogic _grid;
         private EnemyCellRegistry _registry;
 
         private bool _registered;
         private Vector3Int _currentCell;
+
+        /// <summary>格子系统未接线只报一次：逐帧报会把 Console 刷爆，而不报就是"踩地块毫无反应"的静默缺陷</summary>
+        private bool _gridWiringWarned;
 
         /// <summary>本帧生效的减速乘数（视效读数），速度由门禁经账本落地；一份数据两个消费者</summary>
         private float _slowMultiplier = 1f;
@@ -60,7 +65,32 @@ namespace DeepseaOil.Presentation.Actor
         /// <summary>本帧生效的减速乘数（1=没被减速）：诊断面板读数用，与身体颜色读的是同一份数据</summary>
         public float SlowMultiplier => _slowMultiplier;
 
+        private void Awake()
+        {
+            BindPrefabParts();
+        }
+
+        /// <summary>抓预制体上的执行器与视效，一律不新增组件</summary>
+        /// <remarks>补空不覆盖：Awake 与 Initialize 都会调，编辑器装配路径不跑 Awake。</remarks>
+        private void BindPrefabParts()
+        {
+            if (_motor == null) _motor = GetComponent<EnemyMotor>();
+
+            if (_animView == null) _animView = GetComponentInChildren<ActorAnimationView>(true);
+
+            if (_body == null)
+            {
+                _body = _animView != null && _animView.Renderer != null
+                    ? _animView.Renderer
+                    : GetComponentInChildren<SpriteRenderer>(true);
+            }
+
+            // 临时调试件：预制体上的头顶数字
+            if (hpText == null) hpText = GetComponentInChildren<TextMesh>(true);
+        }
+
         /// <summary>组装一只敌人，依赖全部由参数给出；target=null 则随即滑停，registry=null 则不登记</summary>
+        /// <remarks>预制体缺 EnemyMotor 是本类唯一会当场作废生成的装配错误：留着它只会在后续帧里炸成离现场很远的空引用。</remarks>
         public void Initialize(
             Vector2 position,
             in EnemySpec spec,
@@ -70,6 +100,20 @@ namespace DeepseaOil.Presentation.Actor
             EnemyCellRegistry registry,
             Transform parent)
         {
+            BindPrefabParts();
+
+            if (_motor == null)
+            {
+                Debug.LogError(
+                    $"[Enemy] 预制体根节点没有 EnemyMotor（它 [RequireComponent(Rigidbody2D)]）：{name} 生成已作废。" +
+                    "请检查 Assets/Resources/enemies/Enemy_*.prefab 的 Root 组件。",
+                    this);
+
+                Destroy(gameObject);
+
+                return;
+            }
+
             _spec = spec;
             _target = target;
             _grid = grid;
@@ -81,18 +125,15 @@ namespace DeepseaOil.Presentation.Actor
 
             if (parent != null) transform.SetParent(parent, true);
 
-            BuildBody();
-
-            _motor = gameObject.AddComponent<EnemyMotor>();
-
-            // 建完刚体立刻固化物理参数，否则到首次读位置间的物理步用默认重力跑
+            // 建完刚体立刻固化物理参数，否则到首次读位置间的物理步用预制体上的旧值跑
             _motor.EnsureInitialized();
 
             _logic = new EnemyLogic(_motor, spec);
 
             _motor.Facing = facing;
 
-            BuildVisuals();
+            UpdateHpText();
+
             UpdateCell(force: true);
         }
 
@@ -124,6 +165,19 @@ namespace DeepseaOil.Presentation.Actor
             _animView?.TriggerHurt();
 
             UpdateHpText();
+        }
+
+        /// <summary>头顶耐久数字（临时调试件）；只在数值变了才写，0 显示空串（显示"0"会让人以为还有 0 点血）</summary>
+        /// <remarks>注意朝向镜像：数字挂在 Root 下，敌人朝左时 Root 的 localScale.x 为负，文字会跟着镜像 —— 调试可读即可，正式表现请做进预制体。</remarks>
+        private void UpdateHpText()
+        {
+            if (hpText == null) return;
+
+            string text = Hp > 0 ? Hp.ToString() : string.Empty;
+
+            if (hpText.text == text) return;
+
+            hpText.text = text;
         }
 
         /// <remarks>由 CombatDirector 调用而非 Update：速度一个物理帧只提交一次，视效同频刷新以免一帧不同步。</remarks>
@@ -174,6 +228,8 @@ namespace DeepseaOil.Presentation.Actor
 
         private void OnDrawGizmosSelected()
         {
+            if (_spec == null) return;
+
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(transform.position, _spec.Radius);
 
@@ -186,95 +242,6 @@ namespace DeepseaOil.Presentation.Actor
             if (_registry != null && _registered) _registry.Unregister(this);
         }
 
-        private void BuildBody()
-        {
-            gameObject.AddComponent<Rigidbody2D>();
-
-            var collider = gameObject.AddComponent<CircleCollider2D>();
-            collider.radius = _spec.Radius;
-        }
-
-        /// <summary>建视觉子节点 View：Root 只留物理与逻辑，抖动/后坐力/伪高度将来只改 View 的 localPosition</summary>
-        /// <remarks>HpText 仍挂在 Root 下：数字不该跟着 View 抖，且它的 y 就是物理体中心。</remarks>
-        private void BuildVisuals()
-        {
-            var view = new GameObject("View");
-
-            view.transform.SetParent(transform, false);
-
-            SpriteRenderer body = view.AddComponent<SpriteRenderer>();
-
-            PrimitiveSprites.Configure(
-                body,
-                PrimitiveSprites.Circle,
-                ConfigModule.Visuals.enemyBodyNormal,
-                RenderOrder.ActorOrder(Position.y),
-                _spec.Radius * 2f);
-
-            _animView = view.AddComponent<ActorAnimationView>();
-
-            BuildHpText();
-            UpdateHpText();
-            UpdateBodyColor();
-        }
-
-        /// <summary>建耐久数字；字体取不到就不建（TextMesh 无字体会画成方块），不报错</summary>
-        private void BuildHpText()
-        {
-            Font font = BuiltinFont();
-
-            if (font == null) return;
-
-            var go = new GameObject("HpText");
-
-            go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, HpTextOffsetY, 0f);
-
-            _hpText = go.AddComponent<TextMesh>();
-
-            _hpText.font = font;
-            _hpText.fontSize = 64;
-            _hpText.characterSize = HpTextCharacterSize;
-
-            // 锚点居中配合偏移 0；LowerCenter 会让数字往上长
-            _hpText.anchor = TextAnchor.MiddleCenter;
-            _hpText.alignment = TextAlignment.Center;
-            _hpText.color = Color.white;
-
-            // 材质必须从字体上取，不给就是粉红方块
-            var textRenderer = _hpText.GetComponent<MeshRenderer>();
-
-            textRenderer.sharedMaterial = font.material;
-
-            // sortingOrder 必须显式设，否则数字会和自己的身体抢先后
-            textRenderer.sortingOrder = RenderOrder.ActorOverlay;
-        }
-
-        private static Font BuiltinFont()
-        {
-            for (int i = 0; i < BuiltinFontNames.Length; i++)
-            {
-                try
-                {
-                    Font font = Resources.GetBuiltinResource<Font>(BuiltinFontNames[i]);
-
-                    if (font != null) return font;
-                }
-                catch (System.ArgumentException)
-                {
-                    // 这个版本不认这个名字，试下一个
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>头顶耐久数字；0 时是空串（显示"0"会让人以为还有 0 点血）</summary>
-        public static string HpText(int hp)
-        {
-            return hp > 0 ? hp.ToString() : string.Empty;
-        }
-
         /// <summary>这一帧该不该亮；闪烁是相位而非状态。hz=频率（Hz），非法值按不闪处理。</summary>
         /// <remarks>用 Sin 而非取模：取模在 hz=0 时除零，Sin 恒为 0。</remarks>
         public static bool IsFlashOn(float time, float hz)
@@ -284,42 +251,32 @@ namespace DeepseaOil.Presentation.Actor
             return Mathf.Sin(time * 2f * Mathf.PI * hz) > 0f;
         }
 
-        private void UpdateHpText()
-        {
-            if (_hpText == null) return;
-
-            string text = HpText(Hp);
-
-            if (_hpText.text == text) return;
-
-            _hpText.text = text;
-        }
-
         /// <remarks>闪白相位用 Time.time 而非累加（累加会随帧率漂）；EffectId.Flash 驱动未实现，故每帧刷 color。</remarks>
         private void UpdateBodyColor()
         {
-            SpriteRenderer body = _animView != null ? _animView.Renderer : null;
-
-            if (body == null) return;
+            if (_body == null) return;
 
             bool flashOn = IsHurt && IsFlashOn(Time.time, _spec.FlashHz);
 
-            body.color = ConfigModule.Visuals.EnemyBodyColor(_slowMultiplier, flashOn);
+            _body.color = ConfigModule.Visuals.EnemyBodyColor(_slowMultiplier, flashOn);
         }
 
         /// <remarks>基准取 Root 的物理体 y 而非 View 的 transform y：View 的 localPosition 会被特效改写，拿它排序会让敌人随抖动乱插队。</remarks>
         private void UpdateSortingOrder()
         {
-            SpriteRenderer body = _animView != null ? _animView.Renderer : null;
+            if (_body == null) return;
 
-            if (body == null) return;
-
-            body.sortingOrder = RenderOrder.ActorOrder(Position.y);
+            _body.sortingOrder = RenderOrder.ActorOrder(Position.y);
         }
 
         private void UpdateCell(bool force)
         {
-            if (_registry == null || _grid == null) return;
+            if (_registry == null || _grid == null)
+            {
+                WarnMissingGridOnce();
+
+                return;
+            }
 
             Vector3Int cell = _grid.WorldToCell(Position);
 
@@ -333,6 +290,22 @@ namespace DeepseaOil.Presentation.Actor
                 _registry.Register(cell, this);
                 _registered = true;
             }
+
+            // 跨格（含首次登记）要报一次进格：进格那一下的效果（瞬时伤害/击退）由格子系统补给这一个目标，
+            // 持续与周期效果仍由格状态自己的节拍提交 —— 两处各管一段，不重不漏。
+            _grid.OnActorEnterCell(cell, this);
+        }
+
+        private void WarnMissingGridOnce()
+        {
+            if (_gridWiringWarned) return;
+
+            _gridWiringWarned = true;
+
+            Debug.LogWarning(
+                $"[Enemy] {name} 的格子系统没接线（grid / registry 有一个是 null）：这只敌人踩地块不会减速、不会掉血。" +
+                "两条生成路径都该注入它们（CombatDirector / CombatDummyHarness）。",
+                this);
         }
 
         private Vector2 TargetPosition()
@@ -356,7 +329,8 @@ namespace DeepseaOil.Presentation.Actor
             EffectContext ctx = EffectContext.At(Position, hitDirection);
             ctx.Tint = ConfigModule.Visuals.enemyBodyNormal;
 
-            EffectModule.Play(EffectId.Shatter, in ctx);
+            // 播哪个特效由预制体说了算，本类不写死
+            EffectModule.Play(deathEffect, in ctx);
 
             Destroy(gameObject);
         }

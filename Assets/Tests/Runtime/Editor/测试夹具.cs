@@ -45,13 +45,9 @@ namespace DeepseaOil.Tests
                 "{\"id\":0,\"name\":\"纯水\"," +
                 "\"type\":0,\"temp\":0,\"wet\":3,\"conductive\":1,\"tags\":0}"));
 
-        /// <summary>一行敌人：半径 0.45、满速 3.6、加速 14、击退衰减 10、停止 0.6、追击 60、耐久 3。</summary>
-        /// <remarks>stun_seconds 与 flash_hz 两列已删（前者无消费者，后者改由 <c>VisualPalette</c> 管辖）。</remarks>
+        /// <summary>一行敌人：显示名"测试敌人"、追击满速 3.6、耐久 3。半径 / 加速度 / 击退衰减 / 停止距离 / 脱战距离已搬进 <c>EnemyTuning</c> 调参 SO，表里不再有这些列。</summary>
         public static Enemy EnemyRow()
-            => new Enemy(JSON.Parse(
-                "{\"id\":1,\"name\":\"测试敌人\",\"radius\":0.45,\"max_speed\":3.6," +
-                "\"acceleration\":14,\"knockback_decay\":10,\"stop_distance\":0.6," +
-                "\"chase_range\":60,\"hp\":3}"));
+            => new Enemy(JSON.Parse("{\"id\":1,\"name\":\"测试敌人\",\"max_speed\":3.6,\"hp\":3}"));
 
         /// <summary>一行玩家：血量 3、接触伤害 1、无敌 0.8、重试 1.2、攻击间隔 0.5、击退 12/12、接触半径 1。</summary>
         public static Player PlayerRow()

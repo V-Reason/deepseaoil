@@ -44,7 +44,7 @@ namespace DeepseaOil.Logic.Movement
         /// <summary>角色共用运动参数，只写不读</summary>
         CharacterConfig Config { get; }
 
-        /// <summary>装配期注入运动参数：玩家给 SO，敌人由 EnemySpec 按表值造一份</summary>
+        /// <summary>装配期注入运动参数：玩家给 PlayerConfig，敌人由 EnemySpec 合表值与 EnemyTuning 造一份</summary>
         void Configure(CharacterConfig config);
 
         /// <summary>移动层的"走"：有惯性按加速度逼近，零惯性当帧直达；方向可未归一化</summary>

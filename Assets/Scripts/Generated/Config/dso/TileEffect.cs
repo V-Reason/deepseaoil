@@ -26,7 +26,6 @@ public sealed partial class TileEffect : Luban.BeanBase
         { var __json0 = _buf["value1"]; if(!__json0.IsArray) { throw new SerializationException(); } Value1 = new System.Collections.Generic.List<float>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { float __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = __e0; }  Value1.Add(__v0); }   }
         { var __json0 = _buf["value2"]; if(!__json0.IsArray) { throw new SerializationException(); } Value2 = new System.Collections.Generic.List<float>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { float __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = __e0; }  Value2.Add(__v0); }   }
         { var __json0 = _buf["interval"]; if(!__json0.IsArray) { throw new SerializationException(); } Interval = new System.Collections.Generic.List<float>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { float __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = __e0; }  Interval.Add(__v0); }   }
-        { var __json0 = _buf["flag"]; if(!__json0.IsArray) { throw new SerializationException(); } Flag = new System.Collections.Generic.List<bool>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { bool __v0;  { if(!__e0.IsBoolean) { throw new SerializationException(); }  __v0 = __e0; }  Flag.Add(__v0); }   }
     }
 
     public static TileEffect DeserializeTileEffect(JSONNode _buf)
@@ -58,10 +57,6 @@ public sealed partial class TileEffect : Luban.BeanBase
     /// 触发间隔
     /// </summary>
     public readonly System.Collections.Generic.List<float> Interval;
-    /// <summary>
-    /// 特殊开关
-    /// </summary>
-    public readonly System.Collections.Generic.List<bool> Flag;
    
     public const int __ID__ = -1675093267;
     public override int GetTypeId() => __ID__;
@@ -79,7 +74,6 @@ public sealed partial class TileEffect : Luban.BeanBase
         + "value1:" + Luban.StringUtil.CollectionToString(Value1) + ","
         + "value2:" + Luban.StringUtil.CollectionToString(Value2) + ","
         + "interval:" + Luban.StringUtil.CollectionToString(Interval) + ","
-        + "flag:" + Luban.StringUtil.CollectionToString(Flag) + ","
         + "}";
     }
 }

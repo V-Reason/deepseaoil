@@ -67,10 +67,11 @@ Unity asmdef 引用**不传递**！若在 A 层使用了 B 层公开的类型，
 1. **Excel 表格 (`ConfigWorkspace/Data/*.xlsx`)**：
    - 归策划管辖：只放核心结算数值（HP/伤害）、元素反应网、地块生效节奏、波次编排。
    - 严禁放置物理加速度、击退衰减、手感曲线、闪白频率及美术文件路径。
+   - 现状参照：`enemy` 表已按此瘦身到 **`id` / `name` / `max_speed` / `hp`**（见 `Docs/表格数据配置/最新表格与SO规范.md`）。
    - 改表前必须阅读 `ConfigWorkspace/AGENTS.md`，执行校验并走镜像发布。
 2. **调参 SO (`Assets/Scripts/Data/Settings/*.cs` & `Resources/tuning/`)**：
-   - 归程序管辖：玩家/敌人运动学参数（`CharacterConfig` / `PlayerConfig`）、投掷抛物线手感（`ThrowTuning`）、掉落物手感（`DropTuning`）、颜色与视觉频率（`VisualPalette`）。
-   - 编辑器内实时生效，无需反复导表。
+   - 归程序管辖：玩家/敌人运动学参数（`CharacterConfig` / `PlayerConfig` / `EnemyTuning`）、投掷抛物线手感（`ThrowTuning`）、掉落物手感（`DropTuning`）、颜色与视觉频率（`VisualPalette`）。
+   - 编辑器内实时生效，无需反复导表；**表里删掉的边缘数值必须落到这里，不能留在代码常量里**（`EnemyTuning` 承接的正是 `enemy` 表的 `radius` / `acceleration` / `knockback_decay` / `stop_distance` / `chase_range`）。
 3. **Spec 防腐隔离原则**：
    - 上层 `Logic` 与 `Presentation` 只读 `*Spec` 包装类（`ProjectileSpec`、`EnemySpec` 等）。
    - 底层表结构删改字段时，**由 Spec 内部吸收重定向，对外公开属性签名保持不变**，严禁波及上层逻辑报错。

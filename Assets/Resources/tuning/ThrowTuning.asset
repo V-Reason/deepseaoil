@@ -14,6 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   originHeight: 0.3
   cameraPlaneDepth: 100
+  flightDuration: 0.6
+  maxHeight: 2
+  maxThrowDistance: 5
+  minThrowDistance: 0.4
   ballRadiusMeters: 0.22
   shadowRadiusMeters: 0.2
   shadowScaleAtPeak: 0.7

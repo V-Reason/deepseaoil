@@ -79,6 +79,15 @@ namespace DeepseaOil.Data
         /// <summary>清除植物用范围（格）</summary>
         public int Radius => (int)_a;
 
+        /// <summary>是不是"进格一下"的一次性效果：只该在进入那一刻生效</summary>
+        /// <remarks>
+        /// 判据是语义而非表里的 <c>flag</c> 列（那列至今无读取点，且 <c>瞬时伤害</c> 行的 level1 填的是 false，按它判会漏）。
+        /// 瞬时伤害 / 击退逐帧重放会变成"每秒 60 次掉血 / 每秒 60 次弹开"——实测冰沙站一秒掉 62 点。
+        /// 持续伤害（按 interval 攒拍）与减速 / 麻痹（续命）不属于这一类。
+        /// </remarks>
+        public bool IsEnterOnly
+            => Kind == TileEffectKind.InstantDamage || Kind == TileEffectKind.KnockBack;
+
         /// <summary>温度继承比率</summary>
         public float TemperatureRatio => _a;
 

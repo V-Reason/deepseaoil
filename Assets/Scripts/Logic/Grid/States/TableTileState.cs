@@ -32,7 +32,9 @@ namespace DeepseaOil.Logic.Grid.States
             _tickAccumulator = 0f;
             _dotAccumulator = 0f;
 
-            SubmitAll(in ctx);
+            // 进格这一拍按"一帧"算：切状态时的进格冲击（ApplyEnterImpact）已经打过一次一次性效果，
+            // 这里只负责把周期效果（DoT）的累加器起个头，不给它当帧补一次伤害。
+            SubmitAll(in ctx, ctx.DeltaTime);
 
             ctx.Scheduler?.ScheduleTick(ctx.Cell);
         }
@@ -63,13 +65,14 @@ namespace DeepseaOil.Logic.Grid.States
         }
 
         /// <summary>按节拍提交效果清单；清单为空也每帧提交 Tick，状态还要判到期</summary>
+        /// <remarks>提交窗口（elapsed）必须往下传：DoT 的累加器按它推进，续命型效果按它续命 —— 见 SubmitAll。</remarks>
         private void ApplyTick(in TileContext ctx)
         {
             float interval = _spec.TickInterval;
 
             if (interval <= 0f)
             {
-                SubmitAll(in ctx);
+                SubmitAll(in ctx, ctx.DeltaTime);
                 return;
             }
 
@@ -80,13 +83,18 @@ namespace DeepseaOil.Logic.Grid.States
             {
                 _tickAccumulator -= interval;
 
-                SubmitAll(in ctx);
+                SubmitAll(in ctx, interval);
             }
         }
 
-        /// <summary>清单效果逐个交给结算口；DoT 按 Interval 攒够才提交</summary>
-        /// <remarks>ctx.Resolver 为 null（逻辑层单跑测试）时静默跳过，不报错也不自己 new 执行者</remarks>
-        private void SubmitAll(in TileContext ctx)
+        /// <summary>清单效果逐个交给结算口；DoT 攒够 Interval 才提交，一次性效果不在这里提交</summary>
+        /// <param name="elapsed">本次提交覆盖的时长（秒）：每帧提交时是一帧，按节拍提交时是 TickInterval</param>
+        /// <remarks>
+        /// ctx.Resolver 为 null（逻辑层单跑测试）时静默跳过，不报错也不自己 new 执行者。
+        /// 🔴 一次性效果（瞬时伤害 / 击退）在这里**刻意跳过**：它们由切状态时的进格冲击（ApplyEnterImpact）与
+        /// 目标跨格时的 OnActorEnterCell 各补一次，逐帧提交会变成每秒 60 次掉血（实测冰沙 62 点/秒）。
+        /// </remarks>
+        private void SubmitAll(in TileContext ctx, float elapsed)
         {
             ITileResolver resolver = ctx.Resolver;
 
@@ -96,26 +104,39 @@ namespace DeepseaOil.Logic.Grid.States
             {
                 TileEffectValue effect = _spec.EnterEffects[i];
 
+                if (effect.IsEnterOnly) continue;
+
                 if (effect.Kind == TileEffectKind.DamageOverTime)
                 {
-                    if (ShouldFire(in effect, ctx.DeltaTime, ref _dotAccumulator))
+                    if (ShouldFire(effect.Interval, elapsed, ref _dotAccumulator))
                         resolver.Apply(ctx.Cell, in effect);
 
                     continue;
                 }
 
-                resolver.Apply(ctx.Cell, in effect);
+                // 续命型（表里没给时长）：把"本次提交的窗口"当它的续命时长交出去。
+                // 生产者的窗口是渲染帧或提交节拍，消费者按物理帧扣时 —— 只续单帧会被扣穿（泥浆"贴着走也不减速"）。
+                TileEffectValue value = effect.Seconds <= 0f && effect.Kind == TileEffectKind.Slow
+                    ? TileEffectValue.Slow(effect.Scale, elapsed)
+                    : effect;
+
+                resolver.Apply(ctx.Cell, in value);
             }
         }
 
-        /// <summary>DoT 累加：攒够 Interval 返回 true，一帧跨多拍只提交一次；accumulator 按效果分开持有，暂停时 deltaTime 为 0 不推进</summary>
-        private static bool ShouldFire(in TileEffectValue effect, float deltaTime, ref float accumulator)
+        /// <summary>DoT 累加：按 elapsed 攒够 interval 返回 true；accumulator 按效果分开持有，暂停时 elapsed 为 0 不推进</summary>
+        /// <remarks>
+        /// 🔴 累加量必须是"本次提交覆盖的时长"而不是单帧 DeltaTime：按 TickInterval 提交时（燃烧/蒸汽/导电，
+        /// 节拍就是从 DoT 自己的 interval 来的）每次提交只加一帧的话，攒够 1 秒要 60 次提交 = 60 秒才掉一次血 ——
+        /// 状态 3 秒就到期了，等于永远不掉血。实测燃烧 3 秒只掉 1 点（还是进格冲击那一次）。
+        /// </remarks>
+        private static bool ShouldFire(float interval, float elapsed, ref float accumulator)
         {
-            if (deltaTime <= 0f) return false;
+            if (elapsed <= 0f) return false;
 
-            float interval = effect.Interval > 0f ? effect.Interval : deltaTime;
+            if (interval <= 0f) interval = elapsed;
 
-            accumulator += deltaTime;
+            accumulator += elapsed;
 
             if (accumulator < interval) return false;
 

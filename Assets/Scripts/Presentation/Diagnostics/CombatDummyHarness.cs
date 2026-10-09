@@ -15,7 +15,7 @@ namespace DeepseaOil.Presentation.Diagnostics
 {
     /// <summary>战斗木桩与受击测试器：一只站着不动的敌人 ＋ 五个不同来源的受击入口，逐条验"扣耐久 / 减速 / 击退 / 碎裂 / 格上减速"</summary>
     /// <remarks>
-    /// 自愈装配：ConfigModule / AssetModule / GameRoot / GameState 与格子系统，缺哪补哪；场景里没有敌人就地造一只默认白模。
+    /// 自愈装配：ConfigModule / AssetModule / GameRoot / GameState 与格子系统，缺哪补哪；场景里没有敌人就按约定预制体实例化一只（缺预制体只报错，不拼白模）。
     /// 驱动不走 Update / FixedUpdate：实现 ISceneRoot ＋ IRenderTicked / IPhysicsTicked 交给 GameRoot（唯一驱动入口）。
     /// 与 CombatRoot 同场时不再自己驱动木桩与格子（避免一帧两次扣血），木桩也交给 CombatDirector。
     /// </remarks>
@@ -24,13 +24,16 @@ namespace DeepseaOil.Presentation.Diagnostics
         /// <summary>世界侧：格子与木桩都在玩家之后推进</summary>
         public int Order => SceneOrder.World;
 
-        [Tooltip("木桩。场景里有 EnemyActor 就拖进来；留空则代码在 spawnPosition 造一只默认白模敌人。")]
+        /// <summary>预制体找不到后的重试间隔（秒）</summary>
+        private const float PrefabRetryInterval = 2f;
+
+        [Tooltip("木桩。场景里摆了敌人预制体实例就拖进来；留空则按 enemies/Enemy_{id} 约定实例化一只。")]
         [SerializeField] private EnemyActor enemy = default;
 
         [Tooltip("地板层适配器（可选）。接了才能验「脚下刷泥」：格子要是不登记，格上效果找不到木桩。")]
         [SerializeField] private TilemapAdapter adapter = default;
 
-        [Tooltip("代码自建木桩时的落点（场景里已摆好木桩时以场景位置为准）。")]
+        [Tooltip("实例化木桩的落点（场景里已摆好木桩时以场景位置为准）。")]
         [SerializeField] private Vector2 spawnPosition = new Vector2(5f, 5f);
 
         [SerializeField] private Vector2 panelOrigin = new Vector2(8f, 8f);
@@ -61,6 +64,17 @@ namespace DeepseaOil.Presentation.Diagnostics
 
         /// <summary>致死碎裂后木桩计数，面板上显示"第几只"</summary>
         private int _dummySerial;
+
+        /// <summary>预制体装配失败后的下次寻址时刻；逐物理帧重试会把 Console 刷满，反而盖住别的日志</summary>
+        private float _prefabRetryAt;
+
+        /// <summary>上一只木桩的减速倍率 / 耐久读数：只在变化时报一行，验收靠它看"移速被减半"与"耐久跳字"</summary>
+        private float _reportedSlow = 1f;
+
+        private int _reportedHp = -1;
+
+        /// <summary>当前这只木桩的表定移速，报读数用（GetEnemy 会现场造 Spec，别每帧调）</summary>
+        private float _spawnMaxSpeed = 1f;
 
         private void Start()
         {
@@ -154,7 +168,6 @@ namespace DeepseaOil.Presentation.Diagnostics
                 ConfigModule.GetAllTileStates(),
                 CreateTileState,
                 element,
-                ConfigModule.GetTileEffects(),
                 _registry);
 
             adapter.Attach();
@@ -193,43 +206,106 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             // 木桩的移动/受击滑停/登记格子都在这一步里；target 为 null ⇒ 原地站桩
             dummy.FixedTick(Time.fixedTime, deltaTime);
+
+            ReportReadouts(dummy);
         }
 
-        /// <summary>木桩在不在；不在（首次装配 / 上一只刚碎裂）就现造一只</summary>
+        /// <summary>减速倍率与耐久的变化才报，逐帧报会把 Console 刷爆（验收要看到的正是这两行读数）</summary>
+        private void ReportReadouts(EnemyActor dummy)
+        {
+            float slow = dummy.SlowMultiplier;
+
+            if (!Mathf.Approximately(slow, _reportedSlow))
+            {
+                _reportedSlow = slow;
+
+                Debug.Log(slow < 1f
+                    ? $"[Harness] 木桩进入减速：移速 ×{slow:F2}（{_spawnMaxSpeed:F2} → {_spawnMaxSpeed * slow:F2} 单位/秒，颜色转减速色）"
+                    : $"[Harness] 木桩减速结束：移速恢复到 ×{slow:F2}（{_spawnMaxSpeed:F2} 单位/秒）");
+            }
+
+            if (dummy.Hp == _reportedHp) return;
+
+            _reportedHp = dummy.Hp;
+
+            Debug.Log($"[Harness] 木桩耐久：{dummy.Hp}（存活 {dummy.IsAlive}）");
+        }
+
+        /// <summary>木桩在不在；不在（首次装配 / 上一只刚碎裂）就按约定预制体补一只</summary>
+        /// <remarks>不再现场拼白模：敌人长什么样是预制体的事，缺件只报错不兜底。</remarks>
         private EnemyActor EnsureDummy()
         {
-            if (enemy == null)
-            {
-                var go = new GameObject("Enemy");
+            if (enemy == null) enemy = SpawnFromPrefab();
 
-                go.transform.position = new Vector3(spawnPosition.x, spawnPosition.y, 0f);
-
-                enemy = go.AddComponent<EnemyActor>();
-
-                _dummySerial++;
-
-                Debug.Log($"[Harness] 场景里没有敌人：已在 {spawnPosition} 生成第 {_dummySerial} 只默认白模木桩。");
-            }
+            if (enemy == null) return null;
 
             if (enemy.Stats != null) return enemy;
 
             Vector2 position = enemy.transform.position;
 
+            EnemySpec spec = ConfigModule.GetEnemy();
+
             enemy.Initialize(
                 position,
-                ConfigModule.GetEnemy(),
+                spec,
                 null,
                 Vector2.right,
                 _grid,
                 _registry,
                 null);
 
-            Debug.Log($"[Harness] 木桩初始化：位置 {position}，耐久 {enemy.Hp}，格子系统 {(_grid == null ? "未接" : "已接")}。");
+            _spawnMaxSpeed = spec.MaxSpeed;
+            _reportedSlow = enemy.SlowMultiplier;
+            _reportedHp = enemy.Hp;
+
+            Debug.Log($"[Harness] 木桩初始化：位置 {position}，耐久 {enemy.Hp}，移速 {_spawnMaxSpeed:F2}，格子系统 {(_grid == null ? "未接" : "已接")}。");
 
             return enemy;
         }
 
-        /// <summary>面板外的五个入口都对应一个按键：1 单次受击 / 2 减速 / 3 击退 / 4 致死 / 5 脚下刷泥</summary>
+        /// <summary>按种类 id 寻址 enemies/Enemy_{id} 并实例化；找不到就报错返回 null（不静默自愈）</summary>
+        /// <remarks>失败后退避 <see cref="PrefabRetryInterval"/> 秒再试：本方法由逐物理帧的 FixedTick 调，不退避就是每秒 60 条同样的报错。</remarks>
+        private EnemyActor SpawnFromPrefab()
+        {
+            if (Time.time < _prefabRetryAt) return null;
+
+            string prefabKey = $"enemies/Enemy_{ConfigModule.GetEnemy().Id}";
+
+            GameObject prefab = AssetModule.IsInitialized ? AssetModule.Load<GameObject>(prefabKey) : null;
+
+            if (prefab == null)
+            {
+                Debug.LogError($"[Harness] 严重阻断：未找到敌人预制体 Assets/Resources/{prefabKey}.prefab！木桩无法生成。请先在 Unity 中创建该预制体。");
+
+                _prefabRetryAt = Time.time + PrefabRetryInterval;
+
+                return null;
+            }
+
+            GameObject go = Instantiate(prefab, spawnPosition, Quaternion.identity);
+            EnemyActor actor = go.GetComponent<EnemyActor>();
+
+            if (actor == null)
+            {
+                Debug.LogError($"[Harness] 预制体 {prefabKey} 根节点未挂载 EnemyActor 组件！木桩生成已作废。");
+                Destroy(go);
+
+                _prefabRetryAt = Time.time + PrefabRetryInterval;
+
+                return null;
+            }
+
+            _prefabRetryAt = 0f;
+
+            _dummySerial++;
+            go.name = $"Enemy_Dummy_{_dummySerial}";
+
+            Debug.Log($"[Harness] 已在 {spawnPosition} 实例化第 {_dummySerial} 只木桩（预制体 {prefabKey}）。");
+
+            return actor;
+        }
+
+        /// <summary>面板外的六个入口都对应一个按键：1 单次受击 / 2 减速 / 3 击退 / 4 致死 / 5 脚下刷泥 / 6 脚下点燃</summary>
         private void PollKeys()
         {
             Keyboard keyboard = Keyboard.current;
@@ -240,7 +316,8 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (keyboard.digit2Key.wasPressedThisFrame) Slow();
             if (keyboard.digit3Key.wasPressedThisFrame) Knockback();
             if (keyboard.digit4Key.wasPressedThisFrame) Kill();
-            if (keyboard.digit5Key.wasPressedThisFrame) CutMudUnderfoot();
+            if (keyboard.digit5Key.wasPressedThisFrame) CutTileUnderfoot(TileStateType.Mud, "泥浆");
+            if (keyboard.digit6Key.wasPressedThisFrame) CutTileUnderfoot(TileStateType.Burn, "燃烧");
         }
 
         /// <summary>[1] 单次受击：验扣耐久与头顶数字</summary>
@@ -295,8 +372,8 @@ namespace DeepseaOil.Presentation.Diagnostics
             Report("致死 999 点 → 木桩碎裂（Shatter）；再按任意键会自动补一只");
         }
 
-        /// <summary>[5] 脚下刷泥：直接把木桩当前所站格切成 Mud，验"格上自动减速"</summary>
-        private void CutMudUnderfoot()
+        /// <summary>[5]/[6] 脚下改地块：把木桩当前所站格切成目标状态，验"格上减速 / 格上掉血"</summary>
+        private void CutTileUnderfoot(TileStateType state, string label)
         {
             EnemyActor dummy = EnsureDummy();
 
@@ -304,18 +381,18 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             if (_grid == null)
             {
-                Report("脚下刷泥：格子未接线（adapter 没接）→ 这条链验不了");
+                Report($"脚下刷{label}：格子未接线（adapter 没接）→ 这条链验不了");
 
-                Debug.LogWarning("[Harness] 脚下刷泥需要 TilemapAdapter：格子没登记就找不到木桩所在的格。", this);
+                Debug.LogWarning($"[Harness] 脚下刷{label}需要 TilemapAdapter：格子没登记就找不到木桩所在的格。", this);
 
                 return;
             }
 
             Vector3Int cell = _grid.WorldToCell(dummy.Position);
 
-            _grid.Transition(cell, TileStateType.Mud);
+            _grid.Transition(cell, state);
 
-            Report($"脚下刷泥：格 {cell} 已提交切 Mud（下一帧结算：格上减速生效，身体转减速色）");
+            Report($"脚下刷{label}：格 {cell} 已提交切 {state}（下一帧结算；减速看 Console 的「进入减速」行，燃烧看耐久跳字）");
         }
 
         private void Report(string fact)
@@ -352,11 +429,12 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             GUILayout.Label($"格子系统: {(_grid == null ? "未接线" : $"已登记 {_grid.CellCount} 格")}   状态格: {(_grid == null ? 0 : _grid.ActiveStateCount)}");
 
-            if (GUILayout.Button("[1] 单次受击（扣耐久 + 头顶数字）")) HitOnce();
+            if (GUILayout.Button("[1] 单次受击（扣耐久）")) HitOnce();
             if (GUILayout.Button("[2] 施加减速 0.5× / 3s（变色）")) Slow();
             if (GUILayout.Button("[3] 施加击退 up × 8（冲量滑停）")) Knockback();
             if (GUILayout.Button("[4] 致死碎裂 999（Shatter 碎片）")) Kill();
-            if (GUILayout.Button("[5] 脚下刷泥（格上自动减速）")) CutMudUnderfoot();
+            if (GUILayout.Button("[5] 脚下刷泥浆（格上自动减速）")) CutTileUnderfoot(TileStateType.Mud, "泥浆");
+            if (GUILayout.Button("[6] 脚下点燃燃烧（格上持续掉血）")) CutTileUnderfoot(TileStateType.Burn, "燃烧");
 
             GUILayout.Label($"最近一次: {_lastAction}");
 

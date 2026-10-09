@@ -28,6 +28,7 @@ namespace DeepseaOil.Data
         private static ThrowTuning _throwTuning;
         private static DropTuning _dropTuning;
         private static VisualPalette _visuals;
+        private static EnemyTuning _enemyTuning;
 
         /// <summary>地块效果缓存，效果号→包装件；装配期装一次，此后只读</summary>
         private static Dictionary<TileEffectType, TileEffectSpec> _tileEffects;
@@ -104,6 +105,16 @@ namespace DeepseaOil.Data
             _throwTuning = ThrowTuning.LoadOrDefault();
             _dropTuning = DropTuning.LoadOrDefault();
             _visuals = VisualPalette.LoadOrDefault();
+
+            // 敌人运动学参数只在这份 SO 里，表里已不再存：缺了没有"字段默认值"可退（那会静默改变手感），当场炸
+            _enemyTuning = AssetModule.Load<EnemyTuning>(EnemyTuning.ResourceKey);
+
+            if (_enemyTuning == null)
+            {
+                throw new ConfigLoadException(
+                    $"[Config] 取不到 {EnemyTuning.ResourceKey}（期望 Assets/Resources/{EnemyTuning.ResourceKey}.asset）：" +
+                    "敌人的判定半径 / 加速度 / 击退衰减 / 停止距离 / 脱战距离全在这份 SO 里，表里已经没有这些值可退。");
+            }
 
             _bound = true;
 
@@ -233,11 +244,12 @@ namespace DeepseaOil.Data
             return _elementRules;
         }
 
+        /// <summary>读一个敌人种类：耐久来自 enemy 表，运动学与半径来自 <see cref="EnemyTuning"/></summary>
         public static EnemySpec GetEnemy(int id = Ids.Enemy)
         {
             EnsureAssets();
 
-            return new EnemySpec(_holder.Tables.TbEnemy.Get(id));
+            return new EnemySpec(_holder.Tables.TbEnemy.Get(id), _enemyTuning);
         }
 
         /// <summary>观感颜色表（SO），观感取值的唯一权威入口</summary>

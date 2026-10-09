@@ -25,7 +25,7 @@ namespace DeepseaOil.Logic
 
         public override void Tick(LogicContext ctx)
         {
-            EnemyIntent intent = _logic.Brain.Intent;
+            EnemyIntent intent = _logic.Intent;
 
             Host.MoveTowards(intent.Direction, intent.Speed);
         }
@@ -33,7 +33,7 @@ namespace DeepseaOil.Logic
         /// <summary>不动就让位</summary>
         public override bool IsDone(LogicContext ctx)
         {
-            return _logic.Brain.Intent.IsIdle;
+            return _logic.Intent.IsIdle;
         }
     }
 }

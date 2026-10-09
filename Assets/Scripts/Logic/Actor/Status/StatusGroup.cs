@@ -10,11 +10,18 @@ namespace DeepseaOil.Logic
     {
         private readonly HurtState _hurt;
 
+        /// <summary>续命窗口的兜底拍数：窗口短于消费者一拍就会被扣穿（见 TickSlow）</summary>
+        private const int SlowFloorTicks = 3;
+
         private float _slowScale = 1f;
 
+        /// <summary>减速剩余时长（秒）；续命型修饰按拍兜底写入，见 TickSlow</summary>
         private float _slowRemaining;
 
-        /// <summary>本拍是否刚被续过一次减速：跨帧续命靠它活过当拍（见 Tick）</summary>
+        /// <summary>本次施加数据里给的时长；&lt;=0 = 表里没填，按"只要在格子上就持续生效"处理</summary>
+        private float _slowGivenSeconds;
+
+        /// <summary>自上一拍以来是否刚被续过一次减速：跨帧续命靠它活过当拍（见 TickSlow）</summary>
         private bool _slowRenewed;
 
         public StatusGroup(ActorLogic logic)
@@ -33,13 +40,11 @@ namespace DeepseaOil.Logic
 
         public float SlowScale => _slowRemaining > 0f ? _slowScale : 1f;
 
-        /// <remarks>续一次减速修饰（格子执行者按格施加）；速度乘数 1=不减速、非数按 1 处理，seconds≤0 忽略</remarks>
+        /// <remarks>续一次减速修饰（格子执行者按格施加）；速度乘数 1=不减速、非数按 1 处理。seconds≤0 = 表里没填时长，按续命处理，不再直接丢弃</remarks>
         public void ApplySlow(float speedScale, float seconds)
         {
-            if (seconds <= 0f) return;
-
             _slowScale = float.IsNaN(speedScale) ? 1f : Mathf.Clamp01(speedScale);
-            _slowRemaining = seconds;
+            _slowGivenSeconds = seconds;
             _slowRenewed = true;
         }
 
@@ -60,14 +65,36 @@ namespace DeepseaOil.Logic
 
         public void Tick(in LogicContext ctx, Vector2 pendingKnockback)
         {
-            // 刚续过的一拍不扣时：格上减速把秒数设成"本帧 Δt"（泥浆每帧提交一次），而扣时按物理 Δt，
-            // 两者相等时恰好归零 ⇒ SlowScale 读成 1f，减速与减速色一起消失（编译器不拦、测试不红，只错手感）。
-            if (_slowRenewed) _slowRenewed = false;
-            else if (_slowRemaining > 0f) _slowRemaining -= ctx.deltaTime;
+            TickSlow(in ctx);
 
             EnterHurtIfPending(in ctx, pendingKnockback);
 
             TickStates(in ctx);
+        }
+
+        /// <summary>减速计时：被续过的那一拍只抬窗口不扣时，没续才按物理 Δt 扣</summary>
+        /// <remarks>
+        /// 🔴 两个坑都在这里：
+        /// ① 扣时按物理 Δt，而生产者的续命窗口是**渲染帧**（泥浆每帧提交一次），0.0167s &lt; 0.02s 时
+        ///    一个物理拍就能把它扣穿 ⇒ 低帧率下大部分物理拍读到的 SlowScale 是 1，表现成"贴着泥浆也不减速"。
+        ///    故窗口兜底到 <see cref="SlowFloorTicks"/> 拍（按消费者自己的钟算，不是写死秒数）。
+        /// ② 表里没填时长（seconds≤0）时按"只要在格子上就持续生效"处理：窗口取兜底拍数，靠每帧续命活着，
+        ///    走开后最多多减速几拍。曾经这里直接 return ⇒ 泥浆一点都不减速。
+        /// </remarks>
+        private void TickSlow(in LogicContext ctx)
+        {
+            if (_slowRenewed)
+            {
+                _slowRenewed = false;
+
+                float window = Mathf.Max(_slowGivenSeconds, SlowFloorTicks * ctx.deltaTime);
+
+                if (window > _slowRemaining) _slowRemaining = window;
+
+                return;
+            }
+
+            if (_slowRemaining > 0f) _slowRemaining -= ctx.deltaTime;
         }
 
         private void EnterHurtIfPending(in LogicContext ctx, Vector2 knockback)

@@ -45,6 +45,8 @@
     | `attack_interval`       | `float`  | 投掷间隔/CD（秒）                  |
 
 #### 3. `enemy.xlsx`（敌人配置表）
+- **落地状态（2026-10-09，已完成）**：`radius` / `acceleration` / `knockback_decay` / `stop_distance` / `chase_range` 已移出表、进 `EnemyTuning`（`Assets/Resources/tuning/EnemyTuning.asset`，`ConfigModule.BindAssets` 取不到即抛 `ConfigLoadException`）；表里只剩 **`id` / `name` / `max_speed` / `hp`**。`flash_hz` 更早已归 `VisualPalette`，`stun_seconds` 已删列。
+- **尚未落地**：`contact_damage` 列还没加 —— 接触伤害目前仍由 `player.contact_damage` ＋ `player.contact_radius` 在 `CombatRoot.UpdatePlayerContact` 里结算；要按怪种区分伤害时才搬（见 `Docs/待办.md`）。
 - **当前痛点**：`flash_hz`（受击闪烁频率）是纯表现；`acceleration`、`knockback_decay` 是运动学控制律；`stun_seconds` 代码已废弃。
 - **划界改动**：
   - **移出至 SO (`EnemyTuning.asset` & `VisualPalette.asset`)**：

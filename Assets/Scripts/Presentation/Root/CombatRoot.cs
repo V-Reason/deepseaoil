@@ -262,7 +262,6 @@ namespace DeepseaOil.Presentation
                 ConfigModule.GetAllTileStates(),
                 CreateTileState,
                 _element,
-                tileEffects,
                 _registry);
 
             // 先订阅格子状态变化再灌初始状态，否则那批泥浆不会被画出来

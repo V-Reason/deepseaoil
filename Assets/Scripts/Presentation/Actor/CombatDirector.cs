@@ -109,13 +109,31 @@ namespace DeepseaOil.Presentation.Actor
             PublishIfChanged();
         }
 
+        /// <summary>按请求实例化一只敌人；预制体缺件是硬错误，当场取消本次生成，不做白模兜底</summary>
+        /// <remarks>寻址约定与地块贴图同构：种类 id → enemies/Enemy_{id}（见 Docs/美术装配指南.md）。</remarks>
         private void SpawnOne(in WaveLogic.SpawnRequest request)
         {
-            var go = new GameObject($"Enemy_{request.WaveIndex}_{request.Remaining}");
+            string prefabKey = $"enemies/Enemy_{_enemySpec.Id}";
 
-            if (_actorRoot != null) go.transform.SetParent(_actorRoot, false);
+            GameObject prefab = AssetModule.IsInitialized ? AssetModule.Load<GameObject>(prefabKey) : null;
 
-            var actor = go.AddComponent<EnemyActor>();
+            if (prefab == null)
+            {
+                Debug.LogError($"[Combat] 严重阻断：未找到敌人预制体 Assets/Resources/{prefabKey}.prefab！本次生成已取消。请先在 Unity 中创建该预制体。");
+                return;
+            }
+
+            GameObject go = Instantiate(prefab, request.Position, Quaternion.identity, _actorRoot);
+            go.name = $"Enemy_{request.WaveIndex}_{request.Remaining}";
+
+            EnemyActor actor = go.GetComponent<EnemyActor>();
+
+            if (actor == null)
+            {
+                Debug.LogError($"[Combat] 预制体 {prefabKey} 根节点未挂载 EnemyActor 组件！生成已作废。");
+                Destroy(go);
+                return;
+            }
 
             actor.Initialize(
                 request.Position,

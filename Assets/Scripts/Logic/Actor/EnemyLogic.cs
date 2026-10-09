@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace DeepseaOil.Logic
 {
-    /// <summary>敌人逻辑层：账本＋状态层＋移动层＋大脑，同构玩家，输入来自 EnemyBrain；帧序见 ActorLogic</summary>
+    /// <summary>敌人逻辑层：账本＋状态层＋移动层＋大脑，同构玩家，输入来自 IEnemyBrain；帧序见 ActorLogic</summary>
     public sealed class EnemyLogic : ActorLogic
     {
         private readonly StatusGroup _status;
@@ -17,14 +17,24 @@ namespace DeepseaOil.Logic
         private Vector2 _pendingKnockback;
 
         public EnemyLogic(IActorMotor motor, EnemySpec spec)
+            : this(motor, spec, EnemyBrainFactory.Create(in spec))
+        {
+        }
+
+        /// <summary>注入大脑：换策略不必改本类；brain=null 按 spec 造默认</summary>
+        public EnemyLogic(IActorMotor motor, EnemySpec spec, IEnemyBrain brain)
             : base(motor, spec.Config)
         {
-            Brain = new EnemyBrain(spec);
+            Brain = brain ?? EnemyBrainFactory.Create(in spec);
             _status = new StatusGroup(this);
             _move = new EnemyMoveGroup(this, motor);
         }
 
-        public EnemyBrain Brain { get; }
+        /// <summary>行为决策者；只认接口，具体策略由装配方决定</summary>
+        public IEnemyBrain Brain { get; }
+
+        /// <summary>本帧意图，由 Brain.Decide 产出；状态层唯一读口（不直接问大脑，换策略不动状态机）</summary>
+        public EnemyIntent Intent { get; private set; }
 
         public StatusGroup Status => _status;
 
@@ -49,12 +59,12 @@ namespace DeepseaOil.Logic
         {
             // 意图必须先入上下文，故大脑决策放此处
             var brainContext = _target.HasValue
-                ? new EnemyBrain.Context(Motor.Position, _target.Value, true)
-                : EnemyBrain.Context.WithoutTarget(Motor.Position);
+                ? new EnemyBrainContext(Motor.Position, _target.Value, true)
+                : EnemyBrainContext.WithoutTarget(Motor.Position);
 
-            EnemyIntent intent = Brain.Decide(in brainContext);
+            Intent = Brain.Decide(in brainContext);
 
-            var snapshot = new InputSnapshot(intent.Direction, false, false);
+            var snapshot = new InputSnapshot(Intent.Direction, false, false);
             var context = new LogicContext(now, deltaTime, default, snapshot);
 
             FixedTick(context);

@@ -2,12 +2,7 @@
   {
     "id": 1,
     "name": "白模敌人",
-    "radius": 0.45,
     "max_speed": 3.6,
-    "acceleration": 14,
-    "knockback_decay": 10,
-    "stop_distance": 0.6,
-    "chase_range": 60,
     "hp": 3
   }
 ]

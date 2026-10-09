@@ -22,12 +22,7 @@ public sealed partial class Enemy : Luban.BeanBase
     {
         { if(!_buf["id"].IsNumber) { throw new SerializationException(); }  Id = _buf["id"]; }
         { if(!_buf["name"].IsString) { throw new SerializationException(); }  Name = _buf["name"]; }
-        { if(!_buf["radius"].IsNumber) { throw new SerializationException(); }  Radius = _buf["radius"]; }
         { if(!_buf["max_speed"].IsNumber) { throw new SerializationException(); }  MaxSpeed = _buf["max_speed"]; }
-        { if(!_buf["acceleration"].IsNumber) { throw new SerializationException(); }  Acceleration = _buf["acceleration"]; }
-        { if(!_buf["knockback_decay"].IsNumber) { throw new SerializationException(); }  KnockbackDecay = _buf["knockback_decay"]; }
-        { if(!_buf["stop_distance"].IsNumber) { throw new SerializationException(); }  StopDistance = _buf["stop_distance"]; }
-        { if(!_buf["chase_range"].IsNumber) { throw new SerializationException(); }  ChaseRange = _buf["chase_range"]; }
         { if(!_buf["hp"].IsNumber) { throw new SerializationException(); }  Hp = _buf["hp"]; }
     }
 
@@ -45,29 +40,9 @@ public sealed partial class Enemy : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 视觉与碰撞半径
-    /// </summary>
-    public readonly float Radius;
-    /// <summary>
     /// 追击满速
     /// </summary>
     public readonly float MaxSpeed;
-    /// <summary>
-    /// 加速度
-    /// </summary>
-    public readonly float Acceleration;
-    /// <summary>
-    /// 击退滑行衰减率
-    /// </summary>
-    public readonly float KnockbackDecay;
-    /// <summary>
-    /// 停止逼近距离
-    /// </summary>
-    public readonly float StopDistance;
-    /// <summary>
-    /// 放弃追击距离
-    /// </summary>
-    public readonly float ChaseRange;
     /// <summary>
     /// 耐久
     /// </summary>
@@ -85,12 +60,7 @@ public sealed partial class Enemy : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "name:" + Name + ","
-        + "radius:" + Radius + ","
         + "maxSpeed:" + MaxSpeed + ","
-        + "acceleration:" + Acceleration + ","
-        + "knockbackDecay:" + KnockbackDecay + ","
-        + "stopDistance:" + StopDistance + ","
-        + "chaseRange:" + ChaseRange + ","
         + "hp:" + Hp + ","
         + "}";
     }

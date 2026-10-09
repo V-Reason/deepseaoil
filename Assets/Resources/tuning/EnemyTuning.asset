@@ -9,13 +9,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 001f8fd4abe106747b2eba29b7f05470, type: 3}
-  m_Name: DropTuning
+  m_Script: {fileID: 11500000, guid: 7c4e9b21d6a34f5e8b0c1d2e3f4a5b60, type: 3}
+  m_Name: EnemyTuning
   m_EditorClassIdentifier: 
-  flightDuration: 1
-  arcHeight: 2
-  homingSpeed: 8
-  reachDistance: 0.05
-  amount: 1
-  bodyDiameter: 0.3
-  triggerRadius: 0.15
+  radius: 0.45
+  acceleration: 14
+  knockbackDecay: 10
+  stopDistance: 0.6
+  chaseRange: 60
