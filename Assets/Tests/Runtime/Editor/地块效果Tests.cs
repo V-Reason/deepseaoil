@@ -1,17 +1,16 @@
 // ---------------------------------------------------------------------------
 // 格上效果链 · 行为测试（"地块改了，敌人却没反应"这一类）
 //
-// 【本轮口径变更】温湿度/元素合成/effectValueList 全部退役。现在：
-//   落地冲击（伤害/击退/麻痹/连锁）归 element_rule，经 ReactionResolver 裁决、由
-//   GridLogic.OnBallHit 一处提交；地面残留（减速/DoT/存活秒数）归 tile_state，
+// 【权责切分】落地冲击（伤害/击退/麻痹/连锁）归 element_rule，经 ReactionResolver 裁决、
+//   由 GridLogic.OnBallHit 一处提交；地面残留（减速/DoT/存活秒数）归 tile_state，
 //   由 TableTileState 按帧提交。两张表不重叠、不互斥。
 //
-// 【仍然要守的静默缺陷】实测过的三个：
+// 【守的是静默缺陷】都是"不报错、只是怪毫无反应"那一类：
 //   ① 减速被丢弃：续命窗口短于一个物理拍就被扣穿，表现为"贴着泥浆也不减速"。
 //   ② DoT 双重计时：攒拍只加单帧 Δt，燃烧 3 秒只掉一次血，等于不掉。
 //   ③ 瞬时伤害逐帧重放：站一秒掉 60 点，进格"一下"的语义完全丢失。
-//   外加本轮新守的两条：④ 首跳伤害必须当帧打出（落地那一帧就扣血）；
-//   ⑤ 连锁标记必须真的把泛洪跑起来（否则"水网导电"只是表里的一列数字）。
+//   ④ 首跳伤害必须当帧打出（落地那一帧就扣血）。
+//   ⑤ 连锁只许发生在导通格上（蒸汽既不可燃也不导通，不许凭空带电）。
 //
 // 【覆盖边界】本文件只跑 Logic ＋ Data（真表、真状态机、真 StatusGroup），
 //   不经过 EnemyActor / CombatDirector / 场景接线：那一层由人工 PlayMode 验收覆盖。
@@ -281,9 +280,9 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(0.5f, status.SlowScale, 1e-4f, "seconds<=0 = 没给时长，不是「无效」；按续命兜底至少活过一拍");
         }
 
-        /// <summary>⑤ 离开减速格要能恢复：续命停掉后不许永远挂着减速。</summary>
+        /// <summary>⑤ 续命停掉后减速必须过期：不做"粘住不放"的减速。</summary>
         [Test]
-        public void 离开泥浆后减速会恢复()
+        public void 没续命时减速会过期()
         {
             StatusGroup status = NewStatus();
             var snapshot = new InputSnapshot(Vector2.zero, false, false);
@@ -292,7 +291,7 @@ namespace DeepseaOil.Tests
 
             float now = 0f;
 
-            // 续命窗口兜底 3 拍：4 拍不续就该过期（不做"粘住不放"的减速）
+            // 续命窗口兜底 3 拍：4 拍不续就该过期
             for (int i = 0; i < 4; i++)
             {
                 now += PhysicsStep;
@@ -303,7 +302,7 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(1f, status.SlowScale, 1e-4f, "没人再续命时减速必须过期，否则离开泥浆还一直是半速");
         }
 
-        /// <summary>⑥ 首跳伤害必须当帧打出：这一条正是本轮要终结的「生成火池/蒸汽后怪走上去跳 0 点伤害」。</summary>
+        /// <summary>⑥ 首跳伤害必须当帧打出：打不出这一帧就是「生成火池/蒸汽后怪走上去跳 0 点伤害」。</summary>
         [Test]
         public void 落地瞬间伤害当帧结算()
         {
@@ -327,11 +326,16 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(
                 1,
                 target.DamageHits,
-                "落地瞬间伤害必须在 OnBallHit 返回前结算：等下一次 Tick 就是「生成蒸汽后怪站着不掉血」的静默 Bug");
+                "落地瞬间伤害必须在 OnBallHit 返回前结算，且只结算一次："
+                + "等下一次 Tick 就是「生成蒸汽后怪站着不掉血」的静默 Bug，多打一次则是重复结算");
+            Assert.AreEqual(2f, target.DamageTotal, 1e-3f, "element_rule #4 的瞬伤是 2 点");
             Assert.Greater(target.KnockImpulse, 0f, "element_rule 里这一行配了击退，必须折算成冲量打出去");
+
+            // 蒸汽既不可燃也不导通 ⇒ 这一行不该有连锁方向，更不该凭空补一次电击
+            Assert.AreEqual(0, target.StunHits, "蒸汽不导电：连锁泛洪的起点必须自己也是导通体");
         }
 
-        /// <summary>⑦ 连锁标记必须真的把泛洪跑起来：表里 trigger_chain=TRUE 的那一行要打出麻痹。</summary>
+        /// <summary>⑦ 连锁标记必须真的把泛洪跑起来：表里 trigger_chain=TRUE 的那一行要额外打出电击。</summary>
         [Test]
         public void 连锁标记会触发泛洪()
         {
@@ -348,7 +352,11 @@ namespace DeepseaOil.Tests
             grid.OnBallHit(cell, BallType.Water);
 
             Assert.AreEqual(TileStateType.ConductZone, grid.StateOf(cell), "水 + 基础电源 → 导电区");
-            Assert.Greater(target.StunHits, 0, "TriggerChain 为真时必须真的泛洪：只写一列标记等于连锁根本不存在");
+
+            // 落地冲击是 1 伤 + 1.5s 麻痹；连锁电击再补 1 伤 + 1.5s。
+            // 只钉"有没有"会假绿 —— 冲击那一份就能满足，必须钉次数才能证明这一列不是死列。
+            Assert.AreEqual(2, target.DamageHits, "TriggerChain 为真时必须真的泛洪：只写一列标记等于连锁根本不存在");
+            Assert.AreEqual(2, target.StunHits, "泛洪的麻痹与落地冲击是两次独立施加");
             Assert.AreEqual(1.5f, target.StunSeconds, 1e-4f, "连锁电击的麻痹时长");
         }
     }

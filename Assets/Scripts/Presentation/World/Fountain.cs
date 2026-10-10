@@ -16,6 +16,7 @@ namespace DeepseaOil.Presentation.World
         Life = 2,
     }
 
+    // 由组合根每帧推进，不是自驱 Update；只认识 IDropSpawner 一个方法
     public sealed class Fountain : MonoBehaviour
     {
         [Header("种类")]
@@ -49,6 +50,7 @@ namespace DeepseaOil.Presentation.World
 
         public bool PlayerInside => _playerInside;
 
+        // 没接线时不产出也不报错，装配日志已由 CombatRoot 报过
         public void Attach(IDropSpawner spawner)
         {
             _spawner = spawner;
@@ -69,6 +71,7 @@ namespace DeepseaOil.Presentation.World
             circle.radius = autoTriggerRadius > 0f ? autoTriggerRadius : 1.5f;
         }
 
+        // 推进一个渲染帧；deltaTime 暂停时为 0，节拍自然冻结
         public void Tick(float deltaTime)
         {
             if (kind == FountainKind.Life) return;
@@ -123,6 +126,7 @@ namespace DeepseaOil.Presentation.World
             _spawner.TrySpawn(new DropSpawnRequest(OutputType, center, landing));
         }
 
+        // 上限 MaxLandingAttempts 次：最小距离 > 最大半径时无解，不能死循环
         private Vector2 RandomLandingOffset()
         {
             const int MaxLandingAttempts = 8;

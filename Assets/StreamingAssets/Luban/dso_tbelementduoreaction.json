@@ -19,7 +19,7 @@
     "impact_knockback": 4,
     "result_duration": 2,
     "effect_radius": 1.5,
-    "trigger_chain": true
+    "trigger_chain": false
   },
   {
     "id": 3,
@@ -30,7 +30,7 @@
     "impact_knockback": 0,
     "result_duration": 4,
     "effect_radius": 2.5,
-    "trigger_chain": true
+    "trigger_chain": false
   },
   {
     "id": 4,

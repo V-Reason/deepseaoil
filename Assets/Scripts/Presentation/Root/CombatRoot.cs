@@ -23,7 +23,8 @@ using cfg.dso;
 namespace DeepseaOil.Presentation
 {
     /// 战斗切片的组合根：装配一次，每帧驱动
-    // 无 Update/FixedUpdate，
+    // 无 Update/FixedUpdate：GameRoot 调 RenderTick 与 FixedTick
+    // 渲染帧=格子→球→落物→喷泉，物理帧=冲量→敌人→玩家受击
     public sealed class CombatRoot : MonoBehaviour, ISceneRoot, IRenderTicked, IPhysicsTicked, IThrowSink
     {
         /// 世界侧排在玩家侧之后
@@ -62,7 +63,7 @@ namespace DeepseaOil.Presentation
         private CombatDirector _combat;
         private TileHighlightView _highlight;
 
-        // <summary>生命神泉的静止累计；</summary>
+        // 生命神泉的静止累计，随场景重建
         private LifeFountainState _lifeFountain;
 
         private Fountain _lifeFountainSource;
@@ -93,7 +94,7 @@ namespace DeepseaOil.Presentation
             _highlight?.Detach();
             gridView?.Detach();
 
-            // 销毁期再问 GameRoot.Instance 会当
+            // 销毁期再问 GameRoot.Instance 会当场造一个新的，只能用 Start 里抓的引用
             if (_root != null) _root.UnregisterSceneRoot(this);
         }
 
@@ -113,7 +114,7 @@ namespace DeepseaOil.Presentation
         {
             if (!IsReady) return;
 
-            // 顺序：格子先跑（泥浆可能本帧到期），
+            // 顺序：格子先跑（泥浆可能本帧到期），再推球与落物，最后喷泉
             _grid.Tick(Time.time, deltaTime);
 
             _balls.Tick(deltaTime);
@@ -141,15 +142,15 @@ namespace DeepseaOil.Presentation
             // ① 落地冲量：必须在物理帧施加，渲染帧施加会漂
             _impulses.FixedTick();
 
-            // ② 敌人先按本帧位置追一步，再让格子按新位置结算（顺
+            // ② 敌人先按本帧位置追一步，再让格子按新位置结算（顺序不能反）
             if (_combat != null) _combat.FixedTick(now, deltaTime);
 
             // ③ 玩家受击：读物理体位置，须在敌人移动之后
             UpdatePlayerContact(now);
         }
 
-        // <summary>播种：E 键把战备种子落成环境发生</summary>
-        // <remarks>合法性判据在 Logic 层（S</remarks>
+        // 播种：E 键把手上的种子落成环境地貌
+        // 合法性判据在 Logic 层（SeedPlanter），本类只转发与报错
         private void TickPlanting()
         {
             InputProvider input = player != null ? player.Input : null;
@@ -179,8 +180,8 @@ namespace DeepseaOil.Presentation
             EffectModule.Play(EffectId.Highlight, in ctx);
         }
 
-        // <summary>生命神泉：九宫格内完全静止达阈值回</summary>
-        // <remarks>三重静止判据（无输入＋速度近零＋位</remarks>
+        // 生命神泉：九宫格内完全静止达阈值即回血
+        // 三重静止判据（无输入＋速度近零＋位移近零）由驱动方给定
         private void TickLifeFountain(float deltaTime)
         {
             if (_lifeFountain == null || _lifeFountainSource == null) return;
@@ -204,12 +205,12 @@ namespace DeepseaOil.Presentation
 
             if (!healed) return;
 
-            // 满血时 TryHeal 返回 false，
+            // 不看 TryHeal 的返回值：healed 已经保证这次该回血，满血顶掉不算错
             logic.Stats.TryHeal();
         }
 
-        // <summary>世界侧两件玩家相关裁决：</summary>
-        // <remarks>判定是纯函数（ContactPro</remarks>
+        // 世界侧两件玩家相关裁决：谁打到玩家、打空怎么重来
+        // 判定是纯函数（ContactProbe.TryFindAttacker），可在 EditMode 测
         private void UpdatePlayerContact(float now)
         {
             PlayerLogic logic = player != null ? player.Logic : null;
@@ -279,8 +280,8 @@ namespace DeepseaOil.Presentation
             TileChainReactor.Clear();
         }
 
-        // <summary>裁决投掷请求（IThrowSin</summary>
-        // <remarks>唯一否决判据：</remarks>
+        // 裁决投掷请求（IThrowSink）：落点合法性属世界信息
+        // 唯一否决判据：落点格没有地板（GridLogic.HasCell）；将来的阻挡/占位物加在这里，玩家侧不用改
         public bool RequestThrow(in ThrowIntent intent)
         {
             if (!IsReady) return false;
@@ -290,7 +291,7 @@ namespace DeepseaOil.Presentation
             return _balls != null && _balls.Throw(in intent);
         }
 
-        // <summary>组装战斗切片：</summary>
+        // 组装战斗切片：依赖全来自参数与 Data 层，无 FindObjectOfType
         private void Assemble()
         {
             if (player == null || gridView == null)
@@ -345,7 +346,8 @@ namespace DeepseaOil.Presentation
 
             int cells = gridView.RegisterCells(_grid);
 
-            // 关卡初始地块优先从场景里的 InitialSetup
+            // 关卡初始地块优先从场景里的 InitialSetup 笔刷层读（策划在编辑器里画）
+            // 没画才退回表驱动的 tile_initial
             int initialStates = gridView.LoadInitialSetupTiles(_grid);
 
             if (initialStates == 0)
@@ -385,7 +387,7 @@ namespace DeepseaOil.Presentation
                 (enableWaves ? "敌人 启用" : "敌人 关闭（「是否刷敌人」未勾选）"));
         }
 
-        // <summary>泉眼接线：弹药泉挂落物产出</summary>
+        // 泉眼接线：弹药泉挂落物产出
         private void AttachFountains()
         {
             for (int i = 0; i < fountains.Length; i++)
@@ -412,8 +414,8 @@ namespace DeepseaOil.Presentation
             }
         }
 
-        // <summary>状态工厂：给 ID 造新实例</summary>
-        // <remarks>不共享原型：状态自己记持续时长</remarks>
+        // 状态工厂：给 ID 造新实例，null = 该 ID 没有实现
+        // 不共享原型：状态自己记持续时长，否则全场共用一个计时器
         private static ITileState CreateTileState(TileStateType id)
         {
             TileStateSpec spec = ConfigModule.TryGetTileState(id);
@@ -456,8 +458,8 @@ namespace DeepseaOil.Presentation
             return director;
         }
 
-        // <summary>精英怪战利品：</summary>
-        // <remarks>掉落方式走既有 IDropSpaw</remarks>
+        // 精英怪战利品：只有 EliteEnemyId 那一行会掉种子
+        // 掉落方式走既有 IDropSpawner 约定，本类不加新规则
         private void OnEnemyKilled(EnemySpec spec, Vector2 position)
         {
             if (spec == null || spec.Id != EliteEnemyId) return;
@@ -469,11 +471,11 @@ namespace DeepseaOil.Presentation
             Debug.Log("[Combat] 精英怪被击杀，掉落了 1 颗战备种子。");
         }
 
-        // <summary>精英怪在 enemy 表里的 id</summary>
+        // 精英怪在 enemy 表里的 id
         private const int EliteEnemyId = 2;
 
-        // <summary>掉落物被领取：世界→玩家通知</summary>
-        // <remarks>裁决在这里而不在掉落物里（掉落物只</remarks>
+        // 掉落物被领取：世界→玩家通知
+        // 裁决在这里而不在掉落物里（掉落物只发事实）；加一种掉落物在这里加 case
         private void OnDropCollected(DropCollected evt)
         {
             PlayerStats stats = player?.Logic?.Stats;
@@ -501,7 +503,7 @@ namespace DeepseaOil.Presentation
             }
         }
 
-        // <summary>HUD 加载完成时重播：</summary>
+        // HUD 加载完成时重播：三块读数各播一次当前值
         private void OnRequestHudRefresh(RequestHudRefresh evt)
         {
             player?.Logic?.Stats.Announce();

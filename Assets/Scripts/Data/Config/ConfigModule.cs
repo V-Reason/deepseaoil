@@ -6,6 +6,7 @@ using cfg.dso;
 namespace DeepseaOil.Data
 {
     /// <summary>数值配置模块，Data 层唯一取值入口：调用方只用 GetXxx 与包装件，数据来自表还是 SO 不外露</summary>
+    // 生成行不出 Data 层：Projectile/Enemy/Player/Wave/TileState/TileInitial 只准出现在 Data/Config/**，破例须登记
     public static class ConfigModule
     {
         private const string PlayerConfigKey = "config/PlayerConfig";

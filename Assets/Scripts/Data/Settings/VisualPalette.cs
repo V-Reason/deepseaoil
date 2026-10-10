@@ -4,6 +4,7 @@ using cfg.dso;
 namespace DeepseaOil.Data
 {
     /// <summary>战斗表现件颜色表；观感参数一律走 SO，不对策划暴露</summary>
+    // 球种色只有一份，三个消费者共用；敌人四态色显式写出，不做插值
 
     [CreateAssetMenu(fileName = "VisualPalette", menuName = "DeepseaOil/Settings/VisualPalette")]
     public sealed class VisualPalette : ScriptableObject

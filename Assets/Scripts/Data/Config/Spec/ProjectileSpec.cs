@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace DeepseaOil.Data
 {
-    // projectile 表行 + ThrowTuning SO；
+    // projectile 表行 + ThrowTuning SO；非法值读取处兜底；行不对外暴露
     public sealed class ProjectileSpec
     {
         private const float FallbackFlightDuration = 0.6f;
@@ -29,8 +29,6 @@ namespace DeepseaOil.Data
 
         public string Name => _row.Name;
 
-        // 抛物线/距离列退役：ThrowTuning SO 承接
-
         /// ThrowTuning.flightDuration，秒
         public float FlightDuration => _tuning != null ? Positive(_tuning.flightDuration, FallbackFlightDuration) : FallbackFlightDuration;
 
@@ -40,7 +38,7 @@ namespace DeepseaOil.Data
         /// ThrowTuning.maxThrowDistance，世界单位；下落时长的距离上限
         public float MaxThrowDistance => _tuning != null ? Positive(_tuning.maxThrowDistance, FallbackMaxThrowDistance) : FallbackMaxThrowDistance;
 
-        // ThrowTuning.minThrowDistance；
+        // 不小于上限时折半上限：否则除以它会趋零
         public float MinThrowDistance
         {
             get
@@ -52,8 +50,7 @@ namespace DeepseaOil.Data
             }
         }
 
-        // <summary>这颗球消耗哪种弹药；</summary>
-        // <remarks>落地反应只看 Type（BallType）</remarks>
+        // 这颗球消耗哪种弹药；落地反应只看 Type（BallType）
         public bool TryGetResource(out ResourceKind kind)
         {
             switch (Type)

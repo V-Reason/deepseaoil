@@ -4,24 +4,19 @@ using cfg.dso;
 
 namespace DeepseaOil.Logic.World
 {
-    // <summary>播</summary>
+    // 播种否决理由，Reject 按此顺序短路：先查手上有没有种子
     public enum PlantRejection
     {
-        // <summary>可</summary>
         None = 0,
 
-        // <summary>该</summary>
         OutOfFloor = 1,
 
-        // <summary>该</summary>
         NotEmpty = 2,
 
-        // <summary>种</summary>
         NoSeed = 3,
     }
 
-    // <summary>播</summary>
-    // <remarks>纯</remarks>
+    // 播种裁决：只有空地（Normal）能种，且手上必须有种子
     public static class SeedPlanter
     {
         public static PlantRejection Reject(

@@ -17,6 +17,7 @@ namespace DeepseaOil.Logic.Wave
         Settle = 2,
     }
 
+    // 波次状态机：只算何时刷/刷几只/刷在哪，不建物体；存活数由驱动方喂入，本类不认识敌人
     public sealed class WaveLogic
     {
         public readonly struct SpawnRequest
@@ -99,6 +100,7 @@ namespace DeepseaOil.Logic.Wave
             return seed;
         }
 
+        // now 与 dt 单位秒；dt 暂停时为 0，节拍自然冻结；anyEnemyAlive 由驱动方数
         public void Tick(
             float now,
             float dt,
@@ -214,6 +216,7 @@ namespace DeepseaOil.Logic.Wave
                 _remaining));
         }
 
+        // 出生点：以玩家为圆心按波次错开角度；不判地形，越界由刚体撞墙兜住
         private Vector2 SpawnPosition(float now, Vector2 playerPosition, float radius)
         {
             float baseAngle = now * 0.7f + _waveIndex * 1.3f;

@@ -74,6 +74,7 @@ namespace DeepseaOil.Logic.Grid.States
 
             if (_spec.DotDamage <= 0) return;
 
+            // 累加量必须是本帧 Δt：若改成按提交次数加常量，攒满 1 秒会变成攒够 60 次
             _dotAccumulator += ctx.DeltaTime;
 
             // while 而非 if：掉帧时按次数补齐，不吞伤害

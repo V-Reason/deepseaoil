@@ -70,6 +70,10 @@ sysinfo.txt
 # ---- Node 依赖（历史上用于 docs 校验脚本，脚本已移除；保留本行以防将来又出现 node_modules）----
 node_modules/
 
+# ---- Python 字节码（Tools/ 下的辅助脚本会生成，不入库）----
+__pycache__/
+*.pyc
+
 # Mono auto generated files
 mono_crash.*
 

@@ -4,12 +4,11 @@ using DeepseaOil.Logic.Grid;
 
 namespace DeepseaOil.Logic.Combat
 {
-    // 接触检测纯函数：取贴在玩家身上的最近者，
-    // 按九宫格查，3×3 覆盖半径1（格边长1）；
-    // 已死目标不算接触（同 GridLogic.Deal）。
+    // 接触检测纯函数：取贴在玩家身上最近的敌人
+    // 判定半径取表值 contact_radius；已死目标不算接触（同 GridLogic.Deal）
     public static class ContactProbe
     {
-        // cellBuffer 复用缓冲（先清空）；
+        // cellBuffer 复用缓冲；contactRadius 世界单位，非法值按 0
         public static bool TryFindAttacker(
             Vector3Int playerCell,
             Vector2 playerPosition,
@@ -52,7 +51,7 @@ namespace DeepseaOil.Logic.Combat
             return true;
         }
 
-        // 伤害值出口：敌人侧只暴露 IContactDamager，
+        // 伤害只能从 IContactDamager 取，敌人不暴露整个 Actor
         private static int ContactDamageOf(IEffectTarget target)
         {
             return target is IContactDamager damager ? damager.ContactDamage : 0;
@@ -75,7 +74,7 @@ namespace DeepseaOil.Logic.Combat
             {
                 IEffectTarget target = targets[i];
 
-                // 已销毁的 Unity 对象在接口引用上不是 null，
+                // 已销毁对象在接口引用上不是 null，读它抛 MissingReferenceException
                 if (target is UnityEngine.Object unityObject && unityObject == null) continue;
 
                 if (target == null) continue;
@@ -98,7 +97,7 @@ namespace DeepseaOil.Logic.Combat
         }
     }
 
-    // <summary>贴身伤害的来源：由敌人自己提供</summary>
+    // 贴身伤害的来源：由敌人自己提供
     public interface IContactDamager
     {
         int ContactDamage { get; }

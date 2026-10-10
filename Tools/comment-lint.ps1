@@ -10,8 +10,10 @@
   ① 预算：每个文件的「注释有效字符数」不得超过 Tools/comment-budget.json 里登记的上限。
           预算只降不升；确需上调必须在 PR 里显式说明并重跑 -Mode seal。
   ② 标签：注释里出现 <summary> / <remarks> 以外的 XML 标签即为违规
-          （<see cref> 必须降级成纯文本类型名）。
+          （<see cref> 必须降级成纯文本类型名）；<summary>/<remarks> 必须在本行内开闭。
   ③ 代码零改动：-Mode verify -Base <rev> 逐行比对非注释代码与某个 git 版本是否一致。
+
+覆盖面：Assets/Scripts/** 与 Assets/Tests/**（测试也是手写代码，同样会单调膨胀）。
 
 口径（与预算表同源，别另立一套）：
   逐行取注释正文，剔除 `//`、`///`、`/* */` 标记；行首行尾空白不计、换行符不计；
@@ -209,7 +211,7 @@ function Get-TargetFiles {
         $out = New-Object System.Collections.ArrayList
         foreach ($r in $rel) {
             if ($r -notmatch '\.cs$') { continue }
-            if ($r -notmatch '^Assets/Scripts/') { continue }
+            if ($r -notmatch '^Assets/(Scripts|Tests)/') { continue }
             if ($r -match 'Generated/') { continue }
             $p = Join-Path $Root ($r -replace '/', '\')
             if (Test-Path -LiteralPath $p) { [void]$out.Add((Get-Item -LiteralPath $p)) }
@@ -217,7 +219,8 @@ function Get-TargetFiles {
         return @($out | Sort-Object FullName -Unique)
     }
 
-    return @(Get-ChildItem -Path (Join-Path $Root 'Assets\Scripts') -Recurse -Filter *.cs -File |
+    return @(Get-ChildItem -Path (Join-Path $Root 'Assets\Scripts'), (Join-Path $Root 'Assets\Tests') `
+                -Recurse -Filter *.cs -File |
             Where-Object { $_.FullName -notmatch $excludeRe } | Sort-Object FullName)
 }
 
@@ -256,7 +259,7 @@ if ($Mode -eq 'seal') {
 
     $head = & git -C $Root rev-parse --short HEAD 2>$null
     $obj = [ordered]@{
-        note      = '注释预算表：每个文件的注释有效字符上限。只降不升；上调必须走 PR 说明 + -Mode seal。口径见 Docs/注释规范.md。'
+        note      = '注释预算表：每个文件的注释有效字符上限。只降不升；上调必须走 PR 说明 + -Mode seal。口径见 Docs/注释规范.md。覆盖面：Assets/Scripts/** 与 Assets/Tests/**；测试文件按文件单独登记（测试的注释/代码比天然高于实现文件，不吃 densityCap）。'
         sealedAt  = [string]$head
         sealedOn  = (Get-Date -Format 'yyyy-MM-dd')
         densityCap = $densityCap

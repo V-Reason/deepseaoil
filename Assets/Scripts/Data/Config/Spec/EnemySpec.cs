@@ -4,6 +4,7 @@ using UnityEngine;
 namespace DeepseaOil.Data
 {
 
+    // 耐久与极速来自 enemy 表，半径/加速度/击退衰减/停距/追击范围退役归 EnemyTuning（世界单位、单位每秒）
     public sealed class EnemySpec
     {
         private readonly Enemy _row;

@@ -4,45 +4,34 @@
 // 【为什么在这里】Assets/Tests/Runtime/Editor/ —— 与 Data层Tests.cs 同机制：
 //   被 DeepseaOil.Tests.EditMode.asmdef 覆盖，被测的各层由它的 references 显式引用。
 //
-// 【留什么 · 砍什么】判据只有一条：这条用例守的是不是「改错了不报错、只表现为手感/观感不对」。
-//   留（测试名即清单）：
+// 【留什么】判据只有一条：这条用例守的是不是「改错了不报错、只表现为手感/观感不对」。
 //   M1  零输入当帧停        —— 残留速度 = 滑行
 //   M2  斜向不快 √2 倍      —— 俯视角最经典的 bug（喂**未归一化**的 (1,1)，让实现自己去归一化）
 //   M3  反向无过渡          —— 有加速度就是惯性，与"零惯性"直接冲突
 //   M4  零输入保持朝向      —— 站住时精灵自己翻面
 //   M5  朝向只翻水平符号    —— 上下移动不该把精灵颠倒
-//   M6  冲刺沿朝向 8 向     —— 本轮改的语义本身（不再是固定 x 轴）
+//   M6  冲刺沿朝向 8 向     —— 冲刺方向 = 最近朝向（不再是固定 x 轴）
 //   M7  冲刺走输入缓冲窗口  —— 框架件（InputBuffer）没被改坏
 //   M10 边界钳位与未接线退化—— 钳位失效 = 走出地图；无条件 Clamp = 把玩家钉死在地图原点
 //   M12 刚体速度真的写入    —— 端口实现的唯一职责
 //   M13 抢占失败不改状态    —— Configure 必须跑在消费成功之后
-//   M14 首帧同样参与抢占    —— 首帧曾是"无抢占"特权帧，第一次按冲刺被吞
+//   M14 首帧同样参与抢占    —— 首帧不许是"无抢占"特权帧
 //   M17 8 向吸附是纯函数    —— **唯一**覆盖 PlayerController 那条吸附/归一化通路的用例
 //   M21 受击期间输入不接管  —— 受击帧的速度由门禁决定
 //   M22 敌人执行器固化物理  —— 连续碰撞检测只有敌人需要
 //
-// 【已删】M8（状态标签 M1/M4 已断）、M9（EventBus 广播是转发断言，消费方在表现层）、
-//   M11（并入 M10）、M19 / M20（见下）。M15/M16/M18 在本文件里**早已不存在**——
-//   旧目录表还留着它们的行，本次一并抹去（它们对 Posix/外力那两条的覆盖从来没有落地）。
-//
-// 【M19 / M20 为什么删，不是修】M19 把 `_config.moveAcceleration` 在装配**之后**改成 20，
-//   断言"第一帧只加到 加速度 × Δt"。而 `ActorLedger` 的加速度判据 `Motion.MoveAcceleration`
-//   是 `Configure` 时一次性折算的快照（`CharacterConfig` → `MotionParams`），事后改 SO 不生效
-//   ⇒ 实测 8.0（零惯性当帧接管）。它断言的是一个**不存在的契约**：「改 SO 后账本即时生效」，
-//   而账本的契约恰恰是「装配期固定」。M20 同一个坑：它想测"有惯性时冲刺仍当帧接管"，
-//   可前提（账本里真有惯性）从未成立 ⇒ 断言恒真，且与 M6 重复。两条都删，不修。
+// 【加速度的坑】ActorLedger 的 Motion.MoveAcceleration 是 Configure 时一次性折算的快照
+//   （CharacterConfig → MotionParams），**装配之后再改 SO 不生效**。
+//   于是"改完配置再断言账本立刻跟上"那类用例断的是一个不存在的契约；要测惯性，
+//   必须在构造 PlayerLogic 之前就把配置改好。
 //
 // 【覆盖边界，写在明处】除 M5 / M12 / M22 外，本文件测的都是 Logic 层：
 //   它直接构造 PlayerLogic ＋ 假执行器，**不经过 PlayerController**。
 //   于是"宿主把输入装配错了"这一类缺陷（未归一化、缓冲推了原始快照、边界没接线）
 //   只有 M17 覆盖 —— 那正是"测试全绿但缺陷仍在"的成因。
-//   **场景搭建与接线检验没有自动化**：按流程由人工完成（建场景、挂组件、连引用、Play 手测）。
-//   本工程曾有一个 `MovementSetupCheck` 菜单做这件事，已删除 —— 它报过 31 项**全部误报**，
-//   而假红会训练人忽略它。宁可不查，也不要报一堆假红。所以：本文件绿了只代表 Logic 层对，
-//   不代表场景接对了。
-//
-// 【与射线检测的关系】PlayerMotor 已不含 groundCheck/wallCheck/groundMask：
-//   俯视角的阻挡由刚体碰撞解算，逻辑层不需要"是否站地/是否贴墙"。
+//   PlayerMotor 已不含 groundCheck/wallCheck/groundMask：俯视角的阻挡由刚体碰撞解算，
+//   逻辑层不需要"是否站地/是否贴墙"。**场景搭建与接线检验没有自动化**：
+//   本文件绿了只代表 Logic 层对，不代表场景接对了。
 //
 // 跑法：Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All
 // ---------------------------------------------------------------------------
@@ -61,15 +50,10 @@ namespace DeepseaOil.Tests
 {
     public class 移动Tests
     {
-        /// <summary>逻辑层测试用的假执行器：账本与控制律用生产实现（底座是共享的 <see cref="MotorProbe"/>）。</summary>
-        private sealed class RecordingMotor : MotorProbe
-        {
-        }
-
         private PlayerConfig _config;
         private PlayerSpec _spec;
         private InputBuffer _buffer;
-        private RecordingMotor _motor;
+        private MotorProbe _motor;
         private PlayerLogic _logic;
 
         [SetUp]
@@ -97,7 +81,7 @@ namespace DeepseaOil.Tests
                 Mathf.Max(_config.inputBufferTime, _config.dashBufferTime),
                 Mathf.RoundToInt(1f / 0.02f));
 
-            _motor = new RecordingMotor();
+            _motor = new MotorProbe();
             _logic = new PlayerLogic(_motor, _spec, _buffer);
         }
 
@@ -107,9 +91,7 @@ namespace DeepseaOil.Tests
             UnityEngine.Object.DestroyImmediate(_config);
         }
 
-        /// <summary>推进一个逻辑帧：帧首把假执行器速度归零，模拟"每帧被物理重新结算"。
-        /// （真实链路里 FixedTick 帧首读的是引擎速度；假执行器若保留上一帧的值，
-        /// 零提交帧会读到旧速度，断言就失真了。）</summary>
+        /// <summary>推进一个逻辑帧：帧首把假执行器速度归零，模拟"每帧被物理重新结算"（真实链路里 FixedTick 帧首读的是引擎速度；假执行器若保留上一帧的值，零提交帧会读到旧速度，断言就失真了）。</summary>
         private void Tick(Vector2 move, float now, bool dashPressed = false, bool resetVelocity = true)
         {
             if (resetVelocity) _motor.EngineVelocity = Vector2.zero;
@@ -135,7 +117,7 @@ namespace DeepseaOil.Tests
         {
             // 喂**未归一化**的 (1,1)：键盘同时按右与上就是这个值。
             // 归一化是实现的义务，不是测试的前提 —— 喂 0.7071 只能证明"已经归一化的输入能过"，
-            // 证明不了"实现会归一化"。曾经这里喂的就是 0.7071，于是斜向快 √2 倍也照样绿。
+            // 证明不了"实现会归一化"：斜向快 √2 倍照样绿。
             Tick(new Vector2(1f, 1f), 0f);
 
             float expected = _config.moveSpeed * _config.moveSpeed;
@@ -147,8 +129,7 @@ namespace DeepseaOil.Tests
                 $"斜向速度平方应为 {expected}（= moveSpeed²），实测 {actual}；接近 2×{expected} 即未归一化");
         }
 
-        /// <summary>回归：8 向吸附是<b>静态纯函数</b>，喂未归一化输入也必须吐单位向量。
-        /// 这是本文件里<b>唯一</b>覆盖 <c>PlayerController</c> 那条通路的用例。</summary>
+        /// <summary>回归：8 向吸附是静态纯函数，喂未归一化输入也必须吐单位向量 —— 本文件里唯一覆盖 PlayerController 那条通路的用例。</summary>
         [Test]
         public void M17_八向吸附输出单位向量()
         {
@@ -205,7 +186,7 @@ namespace DeepseaOil.Tests
             try
             {
                 // 「朝左」与「纯竖直」的先后顺序是本用例的重点：先朝左再朝上，
-                // 水平镜像必须保持朝左（曾因 value.x == 0 时取绝对值而翻回朝右）。
+                // 水平镜像必须保持朝左 —— value.x == 0 时取绝对值就会翻回朝右。
                 motor.Facing = Vector2.left;
                 Assert.Less(go.transform.localScale.x, 0f, "朝左应翻成负缩放");
                 Assert.Greater(go.transform.localScale.y, 0f, "竖直缩放不得被翻转");
@@ -266,9 +247,7 @@ namespace DeepseaOil.Tests
             Assert.IsFalse(_logic.MoveGroup.CanDash(20.1f), "冷却未过时不得再冲");
         }
 
-        /// <summary>回归：第一个物理帧同样参与抢占，不是"无抢占"特权帧。
-        /// 曾有的缺陷是 <c>CheckTransitions</c> 在 <c>CurrentState == null</c> 时直接
-        /// <c>return GetFallBackState()</c>：玩家的第一次按冲刺（冷却与缓冲都成立）会被吞掉。</summary>
+        /// <summary>回归：第一个物理帧同样参与抢占 —— 若 CheckTransitions 在 CurrentState == null 时直接 return GetFallBackState()，玩家第一次按冲刺（冷却与缓冲都成立）会被吞掉。</summary>
         [Test]
         public void M14_首帧同样参与抢占()
         {
@@ -286,9 +265,7 @@ namespace DeepseaOil.Tests
                 "首帧提交成功就该是冲刺速度，而不是基础态的 moveSpeed");
         }
 
-        /// <summary>抢占失败（未提交）时，状态、方向、速度都必须原样保留。
-        /// 走的是<b>冷却未过</b>那条真实路径：抢占判定直接为假，什么都不该被改动。
-        /// （<c>Configure</c> 放在消费之后仍是对的——它保证"状态对象只在提交成功时被改写"。）</summary>
+        /// <summary>抢占失败（未提交）时状态、方向、速度都必须原样保留：Configure 只能跑在消费成功之后，否则状态对象会被一次失败的抢占改写。</summary>
         [Test]
         public void M13_抢占失败不得改动状态()
         {
@@ -365,10 +342,7 @@ namespace DeepseaOil.Tests
             }
         }
 
-        /// <summary>敌人的物理参数归敌人执行器：连续碰撞检测由 <see cref="EnemyMotor"/> 固化。
-        /// 与 M12 同一套写法（创建时<b>故意</b>留成非默认值，否则断言恒真 = 假绿）。
-        /// 收口前这三条参数写在 <c>EnemyActor.BuildBody</c> 里，而执行器自己一份都不设 ——
-        /// "敌人的物理长什么样"因此有两个可能的答案。</summary>
+        /// <summary>敌人的物理参数归敌人执行器：连续碰撞检测由 EnemyMotor 固化 —— 写在别处就是"敌人的物理长什么样"有两个可能的答案，各有各的非默认值才测得出（否则断言恒真 = 假绿）。</summary>
         [Test]
         public void M22_敌人执行器固化敌人侧的物理参数()
         {
@@ -396,8 +370,7 @@ namespace DeepseaOil.Tests
             }
         }
 
-        /// <summary>门禁由状态效果层产出（受击状态），在移动层的状态跑完之后统一施加 ——
-        /// 写在状态之前会被 <c>SnapVelocity</c> 覆盖掉，而那正是旧实现"挨打了却纹丝不动"的成因之一。</summary>
+        /// <summary>门禁由状态效果层产出（受击状态），在移动层的状态跑完之后统一施加 —— 写在状态之前会被 SnapVelocity 覆盖掉，表现就是"挨打了却纹丝不动"。</summary>
         [Test]
         public void M21_受击期间输入不接管速度()
         {
@@ -418,13 +391,8 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(0f, _motor.EngineVelocity.y, 1e-3f, "输入不该在受击帧生效");
         }
 
-        /// <summary>建一个 PlayerMotor 物体：Rigidbody2D ＋ 组件，接线与场景一致。
-        /// 顺序不能反：先加 Rigidbody2D 再加 PlayerMotor。<b>物理参数故意留成非默认值</b>
-        /// （<c>gravityScale = 1</c> / 不冻旋转）：只有这样才能区分"<c>Initialize()</c> 真的跑了"
-        /// 与"值恰好就是默认的 0/false"——早先这里写的是 <c>0f</c>，于是 M12 的两条断言恒真（假绿）。
-        /// <para>注意 EditMode 下 <c>AddComponent</c> 不会触发 <c>Awake</c>，所以本类不能依赖
-        /// <c>Awake</c> 里的自取与自检——<c>PlayerMotor</c> 的物理体引用因此做成惰性兜底，
-        /// M12 走的正是那条路径。</para></summary>
+        /// <summary>建一个 PlayerMotor 物体（先加 Rigidbody2D 再加组件，顺序不能反），接线与场景一致；物理参数故意留成非默认值，否则"Initialize 真的跑了"与"值恰好就是默认的"区分不开 = 假绿。</summary>
+        /// <remarks>EditMode 下 AddComponent 不触发 Awake，所以本类不能依赖 Awake 里的自取与自检 —— PlayerMotor 的物理体引用因此做成惰性兜底，M12 走的正是那条路径。</remarks>
         private static GameObject CreateMotorObject(string name, out PlayerMotor motor, out Rigidbody2D body)
         {
             var go = new GameObject(name);

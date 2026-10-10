@@ -22,7 +22,6 @@ public sealed partial class Projectile : Luban.BeanBase
     {
         { if(!_buf["id"].IsNumber) { throw new SerializationException(); }  Id = (dso.BallType)_buf["id"].AsInt; }
         { if(!_buf["name"].IsString) { throw new SerializationException(); }  Name = _buf["name"]; }
-        { if(!_buf["type"].IsNumber) { throw new SerializationException(); }  Type = (dso.ElementType)_buf["type"].AsInt; }
     }
 
     public static Projectile DeserializeProjectile(JSONNode _buf)
@@ -38,10 +37,6 @@ public sealed partial class Projectile : Luban.BeanBase
     /// 显示名
     /// </summary>
     public readonly string Name;
-    /// <summary>
-    /// 类型
-    /// </summary>
-    public readonly dso.ElementType Type;
    
     public const int __ID__ = 2013538039;
     public override int GetTypeId() => __ID__;
@@ -55,7 +50,6 @@ public sealed partial class Projectile : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "name:" + Name + ","
-        + "type:" + Type + ","
         + "}";
     }
 }

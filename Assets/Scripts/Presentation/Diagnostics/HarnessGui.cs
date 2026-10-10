@@ -1,3 +1,4 @@
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 using UnityEngine;
 
 namespace DeepseaOil.Presentation.Diagnostics
@@ -26,3 +27,4 @@ namespace DeepseaOil.Presentation.Diagnostics
         }
     }
 }
+#endif

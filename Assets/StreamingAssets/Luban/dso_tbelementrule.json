@@ -37,7 +37,7 @@
     "impact_damage": 2,
     "impact_knockback": 3,
     "impact_stun": 0,
-    "trigger_chain": true
+    "trigger_chain": false
   },
   {
     "id": 5,

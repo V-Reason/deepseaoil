@@ -3,16 +3,14 @@
 //
 // 【为什么在这里】Assets/Tests/Runtime/Editor/ 被 DeepseaOil.Tests.EditMode.asmdef 覆盖
 //   （includePlatforms: [Editor] ＋ defineConstraints: [UNITY_INCLUDE_TESTS]），各层的被测代码
-//   由该 asmdef 的 references 显式引用 —— 不再是「落 Assembly-CSharp-Editor 才白拿得到
-//   Assembly-CSharp（被测代码）」那套。目录里的 `Editor` 现在只是目录约定，平台由 asmdef 声明。
+//   由该 asmdef 的 references 显式引用。目录里的 `Editor` 只是目录约定，平台由 asmdef 声明。
 //   （Assets/Tests/Tools/ 仍是 DeepseaOil.EditorTools.Tests，看不见各层，本文件不能放那儿。）
 //
-// 【只留 4 项】判据是「错了会静默出事」：
+// 【4 项】判据是「错了会静默出事」：
 //   A1 配置链路      —— 整层存在的理由；表没读进来，一切上层查询都是 null
 //   A2 重复 Init 抛   —— 幂等守卫失效会静默产生第二份 cfg.Tables
-//   A3 真实资源端到端 —— Key 契约错 = 图标加载不出，只在运行时暴露（D4 的实际形态）
+//   A3 真实资源端到端 —— Key 契约错 = 图标加载不出，只在运行时暴露
 //   A4 失败路径不抛   —— 降级链抛异常会断掉整条加载链
-// 删掉的：旧 A2（快照字段形态，并入 A1）、旧 A6（"不抛异常"烟测）。
 //
 // 只用 public API：AssetRegistry / CacheStore / LifecycleMgr / RefCounter 都是 internal，
 // 跨程序集不可见。
@@ -97,15 +95,16 @@ namespace DeepseaOil.Tests
             Assert.Greater(ball.MaxHeight, 0f, "MaxHeight 未从 ThrowTuning 折算出正值");
             Assert.Greater(ball.MinThrowDistance, 0f, "MinThrowDistance 未从 ThrowTuning 折算出正值");
 
-            // 逃生舱与表清单（手写）必须与生成物一致：`TablesMeta.Count` 是那份清单自己的长度，
-            // 而 `Tables` 属性访问会触发验证器按同一份清单反射查表 —— 两者不一致会在 Init 阶段炸。
+            // 逃生舱可用即可；清单与生成物的真对齐判据见 表清单Tests（反射）。
             Assert.IsNotNull(ConfigModule.Tables, "逃生舱 Tables 为 null");
             Assert.Greater(TablesMeta.Count, 0, "TablesMeta 不能为空");
 
             // 观测面：拉模型必须反映上面这些事实
             var snap = DataMetrics.GetSnapshot();
             Assert.IsTrue(snap.ConfigReady, "DataMetrics.ConfigReady 应为 true");
-            Assert.AreEqual(TablesMeta.Count, snap.TableCount, "DataMetrics.TableCount 与 TablesMeta 不一致");
+
+            // 不断"等于 TablesMeta.Count"：TableCount 就取自它，自比是同义反复。
+            Assert.Greater(snap.TableCount, 0, "DataMetrics.TableCount 应为正数");
         }
 
         // ================================================================
@@ -144,11 +143,9 @@ namespace DeepseaOil.Tests
 
             AssetModule.Release(PanelKey);
 
-            // ── 这里原本还有第二段：「表里真实的 icon 能不能真的加载出来」──
-            // 已删。表里的资源路径列（`icon`）连同那三张示范表
-            // 一起下架了，现在 8 张表**一个 `#path=unity` 列都没有**，这条链路没有真值可测。
-            // 表列 → 资源 Key 这条约定本身仍有活消费者（TilemapAdapter 的 `tiles/Tile_<状态>`），
-            // 它的验收在 PlayMode：Editor 下 Resources.LoadAsync 的完成回调本来就不触发（见 A4 注释）。
+            // 表列 → 资源 Key 这条约定目前没有真值可测：9 张表一个 #path=unity 列都没有。
+            // 仍有活消费者的那条（TilemapAdapter 的 `tiles/Tile_<状态>`）在 PlayMode 验收：
+            // Editor 下 Resources.LoadAsync 的完成回调本来就不触发（见 A4 注释）。
         }
 
         // ================================================================
@@ -187,10 +184,7 @@ namespace DeepseaOil.Tests
         // 辅助
         // ================================================================
 
-        /// <summary>
-        /// 轮询推进加载直到句柄完成。Data 层的队列由 AssetModule.Tick 驱动，
-        /// 而 Resources.LoadAsync 的完成还需要编辑器循环推进 —— 所以既要 Tick 也要 yield。
-        /// </summary>
+        /// <summary>轮询推进加载直到句柄完成：Data 层的队列由 AssetModule.Tick 驱动，而 Resources.LoadAsync 的完成还需要编辑器循环推进 —— 所以既要 Tick 也要 yield。</summary>
         static IEnumerator WaitDone<T>(AsyncHandle<T> handle, string tag) where T : UnityEngine.Object
         {
             for (int i = 0; i < WaitFrames && !handle.IsDone; i++)

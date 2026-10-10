@@ -84,6 +84,7 @@ namespace DeepseaOil.Presentation.Actor
             Debug.Log("[Combat] 敌人清场，等待下一波");
         }
 
+        // 暂停时 timeScale 与 deltaTime 均 0；恢复那帧不补暂停期间欠的生成量
         public void FixedTick(float now, float deltaTime)
         {
             if (_logic == null || _player == null) return;
@@ -157,7 +158,7 @@ namespace DeepseaOil.Presentation.Actor
 
         private void ClearDestroyed()
         {
-
+            // 倒序删：正序会跳过紧挨的下一个元素，漏删不报错、表现为列表变长
             for (int i = _enemies.Count - 1; i >= 0; i--)
             {
                 if (_enemies[i] == null) _enemies.RemoveAt(i);

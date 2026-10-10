@@ -5,19 +5,19 @@ using cfg.dso;
 
 namespace DeepseaOil.Logic.Element
 {
-    // <summary>离散二元反应求解器：(原格地貌</summary>
-    // <remarks>纯函数：不读不写世界状态</remarks>
+    // 离散二元反应求解器：(原格地貌, 球种)
+    // 纯函数：不读不写世界状态
     public static class ReactionResolver
     {
         private static Dictionary<(TileStateType, BallType), ElementRuleSpec> _rules;
 
-        // <summary>追踪开关：置 true 时每次落地</summary>
+        // 追踪开关：置 true 时每次落地都打印命中或未命中
         public static bool TraceEnabled;
 
         public static int RuleCount => _rules?.Count ?? 0;
 
-        // <summary>装配期初始化；</summary>
-        // <remarks>(SourceTile</remarks>
+        // 装配期初始化：建 (SourceTile, BallType) 双键字典
+        // 重复键只报错不覆盖，先到的那行生效
         public static void Initialize(IReadOnlyList<ElementRuleSpec> rules)
         {
             Clear();
@@ -51,7 +51,7 @@ namespace DeepseaOil.Logic.Element
         }
 
         /// <summary>裁决一次落地</summary>
-        // <remarks>未命中任何规则时：</remarks>
+        // 未命中走 Fallback：一级反应兜底，不做空转
         public static ReactionOutcome Resolve(TileStateType currentTile, BallType ball)
         {
             if (_rules != null && _rules.TryGetValue((currentTile, ball), out ElementRuleSpec rule))
@@ -75,7 +75,7 @@ namespace DeepseaOil.Logic.Element
             return fallback;
         }
 
-        // <summary>表未命中时的兜底：</summary>
+        // 表未命中的兜底：空地 + 水/土 才给基础地貌
         private static ReactionOutcome Fallback(TileStateType currentTile, BallType ball)
         {
             if (currentTile != TileStateType.Normal) return ReactionOutcome.Unchanged(currentTile);

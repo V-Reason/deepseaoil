@@ -3,16 +3,16 @@
 //
 // 守的是这一类"不报错、只是格子空着"的缺口：
 //
-//   1. 「表里写出来的每个地块」都必须能造出状态实例
-//      tile_state 的每一行、element_rule 的每个结果地貌，都要能造出状态。
+//   1. 「表里写出来的每个地貌」都必须能造出状态实例
+//      tile_state 的每一行、element_rule 的每个结果地貌、二级反应的产物、种子的播种地貌。
 //      少了实现的表现不是异常，而是"反应发生了、格子却什么都没变"。
 //
-//   2. 切到一个"没有实现"的状态必须失败，且不留下空状态机
+//   2. 切到一个"没有行"的状态必须失败，且不留下空状态机
 //
-//   3. 水球砸空地要落到有实现的状态（不许停在 Normal —— 适配器把 Normal 当擦除）
+//   3. 投球要落到有实现的状态（不许停在 Normal —— 适配器把 Normal 当擦除）
 //
-//   4. 反应网自洽：element_rule 的 (原格, 球种) 组合不许重复；结果地貌都要有行
-//      第 4 条是纯配置守卫：手改 xlsx 时最容易踩的两个坑
+//   4. 纯配置守卫：手改 xlsx 时最容易踩的两个坑 ——
+//      (原格, 球种) 重复（字典静默后写覆盖）、trigger_chain 填在无方向的产物上。
 //
 // 【跑法】Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All
 // 【为什么要在 OneTimeSetUp 里自己 Init】测试是独立的 EditMode 程序集、也不进 PlayMode，
@@ -33,7 +33,7 @@ namespace DeepseaOil.Tests
 {
     public class 状态工厂Tests
     {
-        /// <summary>走完 Init 链的第二段：没有它，任何 <c>ConfigModule.GetXxx()</c> 都会抛。</summary>
+        /// <summary>走完 Init 链的第二段：没有它，任何 ConfigModule.GetXxx() 都会抛。</summary>
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -68,7 +68,7 @@ namespace DeepseaOil.Tests
             return grid;
         }
 
-        /// <summary>与 <c>CombatRoot.CreateTileState</c> 同一条判据：配置里有这一行就能造，没有就返回 <c>null</c>。</summary>
+        /// <summary>与 CombatRoot.CreateTileState 同一条判据：配置里有这一行就能造，没有就返回 null。</summary>
         private static ITileState CreateState(TileStateType id)
         {
             TileStateSpec spec = ConfigModule.TryGetTileState(id);
@@ -97,7 +97,7 @@ namespace DeepseaOil.Tests
         }
 
         [Test]
-        public void 水球砸空地落到有贴图的状态()
+        public void 水球砸空地落到有实现的状态()
         {
             GridLogic grid = NewGrid();
 
@@ -177,10 +177,33 @@ namespace DeepseaOil.Tests
         }
 
         [Test]
-        public void 二级反应的地貌都有实现()
+        public void 二级反应的产物地貌都有实现()
         {
             DuoReactionCatalog catalog = ConfigModule.GetDuoReactions();
 
+            Assert.Greater(catalog.Rules.Count, 0, "element_duo_reaction 一行都没有：二级元素连锁不会发生");
+
+            var missing = new List<string>();
+
+            for (int i = 0; i < catalog.Rules.Count; i++)
+            {
+                DuoReactionSpec duo = catalog.Rules[i];
+
+                if (duo.ResultTile == TileStateType.None || duo.ResultTile == TileStateType.Normal) continue;
+
+                if (CreateState(duo.ResultTile) != null) continue;
+
+                missing.Add($"反应 {duo.Id} → {duo.ResultTile}（id={(int)duo.ResultTile}）");
+            }
+
+            Assert.IsEmpty(missing,
+                "这些二级反应的产物地貌没有对应的状态实现：两个发生器接通了、格子却什么都不变。\n  "
+                + string.Join("\n  ", missing));
+        }
+
+        [Test]
+        public void 种子的播种地貌都有实现()
+        {
             IReadOnlyList<SeedSpec> seeds = ConfigModule.GetAllSeeds();
 
             Assert.Greater(seeds.Count, 0, "seed 表一行都没有：战备配给无种子可发");
@@ -191,8 +214,51 @@ namespace DeepseaOil.Tests
                     CreateState(seeds[i].SpawnTile),
                     $"种子 {seeds[i].Id} 的 spawn_tile={seeds[i].SpawnTile} 造不出状态：播下去会是空地");
             }
+        }
 
-            Assert.Greater(catalog.Count, 0, "element_duo_reaction 一行都没有：二级元素连锁不会发生");
+        /// <summary>连锁标记必须有可走的方向：结果地貌不可燃也不导通时，泛洪只会在受击格上凭空补一次电击。</summary>
+        [Test]
+        public void 连锁标记只出现在有方向的反应上()
+        {
+            var bad = new List<string>();
+
+            IReadOnlyList<ElementRuleSpec> rules = ConfigModule.GetElementRules();
+
+            for (int i = 0; i < rules.Count; i++)
+            {
+                if (!rules[i].TriggerChain) continue;
+
+                if (HasChainDirection(rules[i].ResultTile)) continue;
+
+                bad.Add($"element_rule id={rules[i].Id}：{rules[i].SourceTile} → {rules[i].ResultTile}");
+            }
+
+            DuoReactionCatalog catalog = ConfigModule.GetDuoReactions();
+
+            for (int i = 0; i < catalog.Rules.Count; i++)
+            {
+                DuoReactionSpec duo = catalog.Rules[i];
+
+                if (!duo.TriggerChain) continue;
+
+                if (HasChainDirection(duo.ResultTile)) continue;
+
+                bad.Add($"element_duo_reaction id={duo.Id}：{duo.ElemA} + {duo.ElemB} → {duo.ResultTile}");
+            }
+
+            Assert.IsEmpty(bad,
+                "这些行 trigger_chain=TRUE，但产物既不可燃也不导通 —— 泛洪无处可去，"
+                + "打开泛洪只会让受击格白白多吃一次电击：\n  " + string.Join("\n  ", bad));
+        }
+
+        /// <summary>连锁的两个方向，与 TileChainReactor 的分派同源：可燃/火海走燎原，导通格走导电。</summary>
+        private static bool HasChainDirection(TileStateType result)
+        {
+            if (result == TileStateType.FlameField || TileChainReactor.IsFlammable(result)) return true;
+
+            TileStateSpec spec = ConfigModule.TryGetTileState(result);
+
+            return spec != null && spec.IsConductor;
         }
 
         [Test]
@@ -202,11 +268,11 @@ namespace DeepseaOil.Tests
 
             Vector3Int cell = Vector3Int.zero;
 
-            // 从表里挑一个真的没有行的枚举值：BasicIce 之后的新地貌里，用一个肯定没登记的值
-            const TileStateType absent = (TileStateType)999;
+            // None 是唯一"枚举里有、tile_state 里没有行"的成员，也是"不改地"的语义值
+            const TileStateType absent = TileStateType.None;
 
             Assert.IsFalse(grid.SwitchTileState(cell, absent),
-                "切到一个没有实现的状态必须返回 false");
+                "切到一个没有行、也没有实现的状态必须返回 false");
 
             Assert.AreEqual(TileStateType.Normal, grid.StateOf(cell),
                 "切换失败后格子状态必须保持原样（不能变成「有状态机但读作常规」）");

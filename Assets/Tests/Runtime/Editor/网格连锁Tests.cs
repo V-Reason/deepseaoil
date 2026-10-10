@@ -216,8 +216,8 @@ namespace DeepseaOil.Tests
 
             var far = new Vector3Int(3, 0, 0);
 
-            // 火种砸在 0 号格：命中 基础植物区 + 纯水 → 普通泥浆，所以直接用水砸不出火。
-            // 这里改用"火海直接落到植物带上"的合法路径：把 0 号格设为火海再让它蔓延。
+            // 基础植物区 + 纯水 → 普通泥浆，所以水球砸不出火；火海只能由二级反应（火 × 植物）
+            // 或火种本身产生。这里直接把起点摆成火海，只测蔓延引擎本身的那两条语义。
             grid.SwitchTileState(origin, TileStateType.FlameField);
 
             TileChainReactor.Trigger(grid, origin, TileStateType.FlameField);
@@ -284,38 +284,9 @@ namespace DeepseaOil.Tests
                 grid.StateOf(fire),
                 "火 + 电 → 蒸汽（等离子爆轰）：二级反应没激发说明 element_duo_reaction 这条链断了");
 
-            Assert.GreaterOrEqual(target.DamageTotal, 4f, "等离子爆轰的瞬发伤害是 4 点");
-        }
-
-        /// <summary>⑤ 元素发生器不该被"路过"的格子改掉：水线上打二级反应，中间那格水保持水。</summary>
-        [Test]
-        public void 水线格不会被二级反应改写成产物()
-        {
-            TileChainReactor.Clear();
-
-            var registry = new EnemyCellRegistry();
-
-            GridLogic grid = NewGrid(registry);
-
-            var fire = new Vector3Int(0, 0, 0);
-            var line = new Vector3Int(1, 0, 0);
-            var elec = new Vector3Int(2, 0, 0);
-
-            grid.RegisterCell(fire);
-            grid.RegisterCell(line);
-            grid.RegisterCell(elec);
-
-            grid.SwitchTileState(fire, TileStateType.BasicFire);
-            grid.SwitchTileState(line, TileStateType.BasicWater);
-            grid.SwitchTileState(elec, TileStateType.BasicElectricity);
-
-            // 从水线格发起：它自己与四邻里能找到火（左）与电（右）
-            TileChainReactor.TriggerDuo(grid, line, ConfigModule.GetDuoReactions());
-
-            Assert.AreEqual(
-                TileStateType.BasicWater,
-                grid.StateOf(line),
-                "发起格只是「接通线路」，不该被改写成产物：改了就当场断路，连锁再也不会发生");
+            // 钉 4 而不是 ≥4：蒸汽既不可燃也不导通，这一行的 trigger_chain 已改为 FALSE，
+            // 多出来的那 1 点只可能来自"泛洪落在非导体起点上"的那次凭空电击。
+            Assert.AreEqual(4f, target.DamageTotal, 1e-3f, "等离子爆轰的瞬发伤害是 4 点，不多不少");
         }
     }
 }

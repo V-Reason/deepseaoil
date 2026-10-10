@@ -4,14 +4,14 @@ using DeepseaOil.Data;
 
 namespace DeepseaOil.Logic.Grid
 {
-    // <summary>一次 Tick/状态切换可见的上下文：格子身份、时间</summary>
+    // 一次 Tick/状态切换可见的上下文：格子、时间、两个端口
+    // 时间由驱动方给：状态不读 Time，暂停时 DeltaTime 为 0 冻结
     public readonly struct TileContext
     {
         public readonly Vector3Int Cell;
 
         public readonly float Now;
 
-        /// <summary>本帧时长（秒），暂停时为 0</summary>
         public readonly float DeltaTime;
 
         public readonly ITileScheduler Scheduler;

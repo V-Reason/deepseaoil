@@ -74,6 +74,7 @@ namespace DeepseaOil.Logic.Player
             PublishIfChanged();
         }
 
+        // 时钟取 Time.time：与移动层的 Time.fixedTime 混用会让冷却忽长忽短
         /// <summary>投掷意图，采纳由世界侧裁决</summary>
         /// <remarks>被拒绝时不扣弹药不进冷却。水与土各自消耗自己的弹药池。</remarks>
         public bool RequestThrow(BallType ball, float now)

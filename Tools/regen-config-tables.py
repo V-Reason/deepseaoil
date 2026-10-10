@@ -34,20 +34,9 @@ SHEET = "Sheet1"
 # ---------------------------------------------------------------------------
 
 ENUMS = [
-    ("dso.Quality", True, [
-        ("COMMON", None, "普通"),
-        ("RARE", None, "精良"),
-        ("EPIC", None, "史诗"),
-    ]),
     ("dso.BallType", True, [
         ("Water", 0, "纯水"),
         ("Earth", 1, "纯土"),
-    ]),
-    # projectile.type 列的类型标记（水/土）；保留是为了不改动"球种表带类型"这一既有 schema，
-    # 落地反应只看 BallType，不看这一列。
-    ("dso.ElementType", True, [
-        ("Water", None, "水"),
-        ("Earth", None, "土"),
     ]),
     ("dso.TileStateType", True, [
         ("None", 0, "无状态"),
@@ -105,7 +94,9 @@ TILE_STATE = dict(
         [6, "陶砖", 15, 1.0, 0, "TRUE", "FALSE"],
         [5, "结冰", 8, 1.0, 0, "FALSE", "FALSE"],
         [8, "蒸汽", 3, 1.0, 1, "FALSE", "FALSE"],
-        [20, "导电区", 3, 1.0, 1, "FALSE", "FALSE"],
+        # 导通必须是 TRUE：TileChainReactor 的泛洪起点也走 is_conductor 门禁，
+        # 导电区自己不导通就没有任何一格能把电传下去（水砸电源的整条链会当场死掉）。
+        [20, "导电区", 3, 1.0, 1, "FALSE", "TRUE"],
         [21, "燎原火海", 3, 1.0, 2, "FALSE", "FALSE"],
         [22, "带电荆棘", -1, 0.4, 1, "FALSE", "FALSE"],
         [23, "霜冻冰刺", -1, 0.5, 1, "FALSE", "FALSE"],
@@ -114,12 +105,12 @@ TILE_STATE = dict(
 
 PROJECTILE = dict(
     name="projectile.xlsx",
-    var=["id", "name", "type"],
-    type=["BallType", "string!", "ElementType"],
-    comment=["球种ID", "显示名", "类型"],
+    var=["id", "name"],
+    type=["BallType", "string!"],
+    comment=["球种ID", "显示名"],
     rows=[
-        ["Water", "纯水", "Water"],
-        ["Earth", "纯土", "Earth"],
+        ["Water", "纯水"],
+        ["Earth", "纯土"],
     ],
 )
 
@@ -137,7 +128,9 @@ ELEMENT_RULE = dict(
         [1, "BasicEarth", "Water", "Mud", 0, 0, 0, "FALSE"],
         [2, "BasicWater", "Earth", "Mud", 0, 0, 0, "FALSE"],
         [3, "Mud", "Water", "MudSkid", 0, 2, 0, "FALSE"],
-        [4, "BasicFire", "Water", "Steam", 2, 3, 0, "TRUE"],
+        # trigger_chain 只在结果地貌有连锁方向时才填 TRUE：可燃/火海走燎原，导通走导电。
+        # 蒸汽两样都不是 —— 填 TRUE 只会在受击格上凭空补一次 1.5s 麻痹（详见 TileChainReactor.Propagate）。
+        [4, "BasicFire", "Water", "Steam", 2, 3, 0, "FALSE"],
         [5, "BasicFire", "Earth", "TerracottaBrick", 0, 1, 0, "FALSE"],
         [6, "BasicElectricity", "Water", "ConductZone", 1, 0, 1.5, "TRUE"],
         [7, "BasicIce", "Water", "Freeze", 0, 3, 0, "FALSE"],
@@ -159,8 +152,9 @@ ELEMENT_DUO = dict(
              "瞬发伤害", "击退距离(格)", "结果存续(秒)", "波及半径(格)", "连锁模式"],
     rows=[
         [1, "BasicFire", "BasicPlant", "FlameField", 0, 0, 3, 1, "TRUE"],
-        [2, "BasicFire", "BasicElectricity", "Steam", 4, 4, 2, 1.5, "TRUE"],
-        [3, "BasicIce", "BasicElectricity", "Freeze", 0, 0, 4, 2.5, "TRUE"],
+        # 产物是蒸汽/结冰的行不许填 TRUE：两者既不可燃也不导通，连锁无处可去
+        [2, "BasicFire", "BasicElectricity", "Steam", 4, 4, 2, 1.5, "FALSE"],
+        [3, "BasicIce", "BasicElectricity", "Freeze", 0, 0, 4, 2.5, "FALSE"],
         [4, "BasicElectricity", "BasicPlant", "ChargedThorn", 1, 0, 3, 1, "TRUE"],
         [5, "BasicIce", "BasicFire", "Normal", 0, 0, 6, 2.5, "FALSE"],
         [6, "BasicIce", "BasicPlant", "FrostSpike", 1, 0, 3, 1, "FALSE"],
@@ -261,30 +255,20 @@ def write_header_4plus(ws, var, typ, comment, group="c", extra_left=4):
 
 
 def fresh_sheet(wb):
-    """清空并重建第一张工作表，保留 sheet 名与前三行表头。
+    """清空并重建第一张工作表，只保留 sheet 名。
 
-    🔴 不能用「逐格写 None」清：旧数据可能落在新表头**之上**（上一次运行留下的
-       引用行），清不干净就会与新块的引用行重名，Luban 报「类型 'dso.Xxx' 重复」。
-       重建工作表能保证空白起点；sheet 名必须保留，Luban 按 sheet 名取表
-       （本仓所有表的 sheet 名都是默认的 Sheet1）。
+    🔴 必须整表重建、且**一格旧表头都不留**：表头是 Luban 的 schema 来源
+       （`__tables__` 的 read_schema_from_file 全为真），旧表头比新表头宽时
+       （删列后）右侧会留下孤儿列，报「字段 type 类型 ElementType 非法」这类
+       幽灵字段错误 —— 明明数据行已经写对了。
+       表头四行由 write_header_4plus 按新宽度全量重写，所以无需保留任何旧行。
+       sheet 名必须保留，Luban 按 sheet 名取表（本仓所有表的 sheet 名都是 Sheet1）。
     """
-    from openpyxl import Workbook
-    old = wb[wb.sheetnames[0]]
-    name = old.title
+    name = wb[wb.sheetnames[0]].title
 
-    headers = []
-    for r in range(1, 4):
-        headers.append([old.cell(row=r, column=c).value for c in range(1, old.max_column + 1)])
+    wb.remove(wb[wb.sheetnames[0]])
 
-    wb.remove(old)
-    ws = wb.create_sheet(title=name)
-
-    for ri, row in enumerate(headers, start=1):
-        for ci, v in enumerate(row, start=1):
-            if v is not None:
-                ws.cell(row=ri, column=ci, value=v)
-
-    return ws
+    return wb.create_sheet(title=name)
 
 
 def load_or_new(path):
@@ -299,7 +283,7 @@ def numeric_cells(spec, rows):
 
     🔴 为什么只有地块列转数字：tile_state.id 现行就是数字（42/47/53...），
        且 multiple-enum 之间共用 "None=0" 这类值，字符串名在部分列上会歧义；
-       而 BallType/ElementType 列现行数据就是中文别名，原样保留最稳。
+       而 BallType 列现行数据就是中文别名，原样保留最稳。
     """
     members = next(m for n, _, m in ENUMS if n == "dso.TileStateType")
     value_of = {key: value for key, value, _ in members}

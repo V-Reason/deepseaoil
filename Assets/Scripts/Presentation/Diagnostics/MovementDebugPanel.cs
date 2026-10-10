@@ -1,3 +1,4 @@
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 using DeepseaOil.Logic;
 using DeepseaOil.Logic.Events;
 using DeepseaOil.Logic.Movement;
@@ -91,3 +92,4 @@ namespace DeepseaOil.Presentation.Diagnostics
         }
     }
 }
+#endif

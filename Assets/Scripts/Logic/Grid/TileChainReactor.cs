@@ -6,10 +6,10 @@ using cfg.dso;
 namespace DeepseaOil.Logic.Grid
 {
     // <summary>网格连锁引擎：受控 BFS 泛洪，严禁递归</summary>
-    // <remarks>纯 C#，时间与 Δt 由 GridLogic</remarks>
+    // <remarks>纯 C#：时间与 Δt 由 GridLogic 注入，不读 Time</remarks>
     public static class TileChainReactor
     {
-        // <summary>单次连锁最多波及的格数：</summary>
+        // <summary>单次连锁最多波及的格数：超限即截断并只告警一次</summary>
         public const int MaxChainSteps = 32;
 
         /// <summary>燎原火海每步蔓延的间隔（秒）</summary>
@@ -37,7 +37,7 @@ namespace DeepseaOil.Logic.Grid
         // <summary>火海蔓延前沿：(格, 下次蔓延时刻)；</summary>
         private static readonly List<(Vector3Int Cell, float At)> _flameFront = new List<(Vector3Int, float)>(16);
 
-        // <summary>本轮连锁是否已报过超限告警（只报一次</summary>
+        // <summary>本轮连锁是否已报过超限告警（只报一次）</summary>
         private static bool _warnedOverflow;
 
         private static float _now;
@@ -91,8 +91,8 @@ namespace DeepseaOil.Logic.Grid
             Propagate(grid, origin);
         }
 
-        // <summary>二级元素反应入口：</summary>
-        // <remarks>只有当发起格真的属于某个元素发生器地貌时</remarks>
+        // <summary>二级元素反应入口：两个发生器地貌被导通体连通时触发</summary>
+        // <remarks>发起格必须真的属于元素发生器地貌，否则不触发</remarks>
         public static void TriggerDuo(GridLogic grid, Vector3Int origin, DuoReactionCatalog catalog)
         {
             if (grid == null || catalog == null || !grid.HasCell(origin)) return;
@@ -109,15 +109,18 @@ namespace DeepseaOil.Logic.Grid
 
                 if (!catalog.TryGet(self, grid.StateOf(other), out DuoReactionSpec duo)) continue;
 
-                CommitDuo(grid, origin, other, duo);
+                CommitDuo(grid, origin, duo);
 
                 return;
             }
         }
 
-        // <summary>连锁导电：沿 is_conductor 网格泛</summary>
+        // <summary>连锁导电：沿 is_conductor 网格泛洪，全网同帧结算</summary>
         private static void Propagate(GridLogic grid, Vector3Int origin)
         {
+            // 起点自己也必须是导体：否则「水砸火池生成蒸汽」会凭空电一下受击格
+            if (!grid.IsConductor(origin)) return;
+
             _queue.Clear();
             _visited.Clear();
 
@@ -146,7 +149,7 @@ namespace DeepseaOil.Logic.Grid
 
                     if (!grid.HasCell(next)) continue;
 
-                    // 只有"导通体"能把电传下去：水、泥浆；
+                    // 只有"导通体"能把电传下去：水、泥浆
                     if (!grid.IsConductor(next)) continue;
 
                     _visited.Add(next);
@@ -210,43 +213,30 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        // <summary>提交一次二级反应：改地貌 + 广域冲击；</summary>
-        private static void CommitDuo(GridLogic grid, Vector3Int origin, Vector3Int other, DuoReactionSpec duo)
+        // <summary>提交一次二级反应：发起格改地貌 + 广域冲击</summary>
+        // 产物必定落在发起格：TryGet 命中即证明发起格是这一对发生器之一，没有"中间那格"的可能
+        private static void CommitDuo(GridLogic grid, Vector3Int origin, DuoReactionSpec duo)
         {
-            // 起飞格本身是元素发生器才回写；否则（水线格子把远处的两个发生器接通）
-            // 产物落在另一端的发生器上，中间那格水保持原样，接通路线不被打断
-            bool originIsAnchor = IsAnchor(origin, grid, duo);
-
-            Vector3Int center = originIsAnchor ? origin : other;
-
-            if (grid.StateOf(center) != duo.ResultTile)
+            if (grid.StateOf(origin) != duo.ResultTile)
             {
-                grid.SwitchTileState(center, duo.ResultTile, duo.ResultDuration);
+                grid.SwitchTileState(origin, duo.ResultTile, duo.ResultDuration);
             }
 
             float radius = duo.EffectRadius > MinBlastRadius ? duo.EffectRadius : MinBlastRadius;
 
-            grid.ApplyBlast(center, radius, duo.ImpactDamage, duo.ImpactKnockback);
+            grid.ApplyBlast(origin, radius, duo.ImpactDamage, duo.ImpactKnockback);
 
             if (!duo.TriggerChain) return;
 
-            TileStateType result = grid.StateOf(center);
+            TileStateType result = grid.StateOf(origin);
 
             if (result == TileStateType.FlameField || IsFlammable(result))
             {
-                StartFlame(grid, center, result);
+                StartFlame(grid, origin, result);
                 return;
             }
 
-            Propagate(grid, center);
-        }
-
-        /// <summary>该格是否是本反应的元素发生器之一</summary>
-        private static bool IsAnchor(Vector3Int cell, GridLogic grid, DuoReactionSpec duo)
-        {
-            TileStateType state = grid.StateOf(cell);
-
-            return state == duo.ElemA || state == duo.ElemB;
+            Propagate(grid, origin);
         }
 
         /// <summary>可燃面：能被火海点燃并烧穿的地貌</summary>

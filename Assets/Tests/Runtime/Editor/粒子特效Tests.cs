@@ -8,17 +8,10 @@
 // 【只用 public API】与 Data层Tests 同一约定：internal 类型（EffectCatalog / EffectSpec）
 //   跨程序集不可见，所以本文件不碰它们，也就不需要 InternalsVisibleTo。
 //
-// 【留什么 · 砍什么】判据只有一条：这条用例守的是不是「改错了不报错、只表现为手感/观感不对」。
-//   留：池的收支（上限生效 / 归还超限销毁 / 失败播放必须归还），EffectContext 的零值与退化，
-//       失败模式必须报错且不抛（未 Init / 未注册），幂等守卫，no-op 守卫，
-//       作者乘数只缩放不覆盖，单例型合并，处理旧句柄的 epoch 语义。
-//   砍：P1_Prewarm 回调计数（与 P2/P4 的池收支重复的转发断言）、T2_句柄相等与哈希
-//       （转发 ＋ ToString 文本断言）、M2_哨兵静默返回（与 M1/D4 同一守卫类）、
-//       M5_空跑不抛（烟测；DriverCount>0 是装配事实）、M6_Preload 未 Init（与 M1 同型）。
-//   删：M7_懒加载在 AssetModule 未 Init 时被拒且不抛 —— 它测的是"优雅降级"，
-//       而降级路径**本来就要 Debug.LogError**，用例却没声明 LogAssert.Expect：
-//       断言与实现自相矛盾（本机跑必红）。"未 Init 时不崩"在 EffectModule 里已有
-//       IsInitialized 守卫这一层结构保证，再钉一遍没有增量。
+// 【守什么】判据只有一条：这条用例守的是不是「改错了不报错、只表现为手感/观感不对」。
+//   池的收支（上限生效 / 归还超限销毁 / 失败播放必须归还），EffectContext 的零值与退化，
+//   失败模式必须报错且不抛（未 Init / 未注册），幂等守卫，no-op 守卫，
+//   作者乘数只缩放不覆盖，单例型合并，处理旧句柄的 epoch 语义。
 //
 // 【不覆盖】渲染结果、粒子外观、真实 prefab 的加载（需要美术资产，只能人工验收）、
 //   播放到期后的自动回收（EditMode 下粒子不模拟，断言它等于写假测试）。
@@ -176,7 +169,7 @@ namespace DeepseaOil.Tests
             pool.Dispose();
         }
 
-        /// <summary>零值与"只写一个字段"都必须归一：参考实现这里会把特效缩到 1%（<c>Mathf.Max(0.01f, 0)</c>）。</summary>
+        /// <summary>零值与"只写一个字段"都必须归一：参考实现这里会把特效缩到 1%（Mathf.Max(0.01f, 0)）。</summary>
         [Test]
         public void T1_EffectContext默认值与部分初始化()
         {

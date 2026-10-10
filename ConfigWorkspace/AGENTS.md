@@ -18,7 +18,7 @@
   - 当前 9 张表**全部登记在 `__tables__.xlsx`**；加新表必须在这里加一行，否则不会被收集
   - `__tables__.xlsx` 的 `output` 列决定生成 JSON 的文件名（`dso.TbEnemy` → `dso_tbenemy`）；留空默认 `<模块>_<表名>`
   - 🔴 **改表优先用 `python Tools/regen-config-tables.py`**（在仓库根跑）：它按一处定义重写 9 张表的列结构与数据，自带 `(source_tile, ball_type)` 查重与外键校验。手改 xlsx 的两条实测坑（重建工作表破坏嵌套子表头、`full_name` 只在块首行有值）见 `Docs/表格数据配置/技术文档_配表管线.md` 第 2 节
-  - `Data/TXT/` 是**历史手记快照**，不是数据源；真正的源是 xlsx
+  - `Data/` 下**只有 xlsx**，没有 `.txt` / `.md` 手记快照（旧快照已删，它们与 schema 脱节会误导改表的人）
 - `Tools/Luban/`：Luban 工具本体（走 Git LFS）
 - `output/`：中间产物（gitignore）。**Luban 先写这里，成功后才镜像拷贝进 Assets**
 - `logs/`：每次运行的完整输出（gitignore）

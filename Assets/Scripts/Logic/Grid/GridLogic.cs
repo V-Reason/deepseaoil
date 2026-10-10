@@ -74,7 +74,7 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>登记合法格</summary>
+        /// <summary>登记合法格；initial 参数当前不读，地貌由 SwitchTileState 改</summary>
         public void RegisterCell(Vector3Int cell, TileStateType initial = TileStateType.Normal)
         {
             _cells.Add(cell);
@@ -244,6 +244,7 @@ namespace DeepseaOil.Logic.Grid
         }
 
         /// <summary>对格上目标续一次减速；状态实现按帧调它，seconds 就是本帧窗口</summary>
+        /// 续减速不做快照，离开泥浆自然过期；替换成一次性大窗口会短于物理帧被扣穿
         public void ApplySlowCell(Vector3Int cell, float speedScale, float seconds)
         {
             if (speedScale >= 1f) return;
@@ -319,7 +320,7 @@ namespace DeepseaOil.Logic.Grid
             }
         }
 
-        /// <summary>切换某格状态；同状态 no-op</summary>
+        /// <summary>切换某格状态；同状态 no-op，未登记的格与无表行的状态一律拒绝</summary>
         /// <remarks>durationOverride &gt; 0 时覆盖表里的 duration（二级反应的结果存续用它）；不改贴图以外任何东西，贴图由 EventBus 订阅者刷。</remarks>
         public bool SwitchTileState(Vector3Int cell, TileStateType next, float durationOverride = 0f)
         {

@@ -6,8 +6,7 @@ using cfg.dso;
 
 namespace DeepseaOil.Logic.Player
 {
-    // <summary>玩</summary>
-    // <remarks>种</remarks>
+    // 玩家三条池子独立：水弹药 / 土弹药 / 种子
     public sealed class PlayerStats : IAlivable
     {
         private readonly PlayerSpec _spec;
@@ -31,7 +30,7 @@ namespace DeepseaOil.Logic.Player
 
         public int Earth { get; private set; }
 
-        // <summary>当</summary>
+        // 手上那一颗种子：GrantSeed 顶替不叠加，放置即清空
         public SeedType Seed { get; private set; }
 
         public int WaterCapacity => _spec.WaterCapacity;
@@ -42,12 +41,13 @@ namespace DeepseaOil.Logic.Player
 
         public float Current => _current;
 
-        // <remarks>必</remarks>
+        // 必须写成 !(now < invulnerableUntil)：否则 NaN 时永久无敌且看不出来
         public static bool CanTakeDamage(float now, float invulnerableUntil)
         {
             return !(now < invulnerableUntil);
         }
 
+        // 被无敌帧挡掉时不扣血也不写无敌；接触贴住会重复结算，靠无敌帧挡
         public bool ApplyDamage(float amount, float now)
         {
             if (amount <= 0f) return false;
@@ -63,7 +63,7 @@ namespace DeepseaOil.Logic.Player
             return true;
         }
 
-        // <summary>回</summary>
+        // 满血返回 false：调用方靠它判断这次有没有真回血
         public bool TryHeal(float amount = 1f)
         {
             if (amount <= 0f) return false;
@@ -95,7 +95,7 @@ namespace DeepseaOil.Logic.Player
             return kind == ResourceKind.Water ? WaterCapacity : EarthCapacity;
         }
 
-        // <summary>消</summary>
+        // 扣成功才发 PlayerAmmoChanged，HUD 只认这条事件
         public bool TryConsume(ResourceKind kind, int amount = 1)
         {
             if (amount <= 0) return false;
@@ -110,7 +110,7 @@ namespace DeepseaOil.Logic.Player
             return true;
         }
 
-        // <summary>补</summary>
+        // 泉眼补满：已满返回 false，语义同 TryConsume
         public bool Refill(ResourceKind kind)
         {
             int capacity = CapacityOf(kind);
@@ -125,7 +125,6 @@ namespace DeepseaOil.Logic.Player
             return true;
         }
 
-        // <summary>发</summary>
         public bool GrantSeed(SeedType seed)
         {
             if (seed == SeedType.None) return false;
@@ -137,7 +136,6 @@ namespace DeepseaOil.Logic.Player
             return true;
         }
 
-        // <summary>消</summary>
         public bool TryConsumeSeed()
         {
             if (Seed == SeedType.None) return false;

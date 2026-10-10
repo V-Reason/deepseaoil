@@ -1,5 +1,0 @@
-##var	id	name	enemies_per_wave	spawn_interval	initial_delay	respawn_delay	spawn_radius
-##type	int	string!	"int!#range=[1,100]"	"float!#range=[0.01,10]"	"float!#range=[0,60]"	"float!#range=[0,60]"	"float!#range=[0.5,50]"
-##group	c	c	c	c	c	c	c
-##comment	编号	显示名	每波敌人数	同波内两只之间的间隔	开局到第一波的等待	清完一波到下一波的等待	出生环半径
-	1	默认波次	4	0.25	1.5	2.5	5

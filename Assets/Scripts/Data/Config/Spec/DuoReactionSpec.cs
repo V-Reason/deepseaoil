@@ -2,7 +2,7 @@ using cfg.dso;
 
 namespace DeepseaOil.Data
 {
-
+    /// <summary>一条二级元素反应：两个发生器地貌 → 激发产物 + 广域波及 + 存续秒数</summary>
     public sealed class DuoReactionSpec
     {
         private readonly ElementDuoReaction _row;

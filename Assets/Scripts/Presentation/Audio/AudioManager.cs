@@ -306,7 +306,6 @@ namespace DeepseaOil.Presentation
             return clip;
         }
 
-        // 配置
         private void LoadConfig(string key)
         {
             var config = AssetModule.Load<AudioConfig>(key);
@@ -339,7 +338,6 @@ namespace DeepseaOil.Presentation
             }
         }
 
-        // 音量
         public void SetBgmVolume(float value)
         {
             _bgmVolume = Mathf.Clamp01(value);
