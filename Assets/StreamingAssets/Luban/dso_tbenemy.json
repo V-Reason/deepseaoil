@@ -1,8 +1,16 @@
 [
   {
     "id": 1,
-    "name": "白模敌人",
-    "max_speed": 3.6,
-    "hp": 3
+    "name": "普通怪",
+    "max_speed": 3.5,
+    "hp": 3,
+    "contact_damage": 1
+  },
+  {
+    "id": 2,
+    "name": "精英怪",
+    "max_speed": 4.2,
+    "hp": 6,
+    "contact_damage": 2
   }
 ]

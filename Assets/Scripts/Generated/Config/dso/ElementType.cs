@@ -21,14 +21,6 @@ namespace cfg.dso
         /// 土
         /// </summary>
         Earth = 1,
-        /// <summary>
-        /// 地形种子
-        /// </summary>
-        Seed = 2,
-        /// <summary>
-        /// 地形
-        /// </summary>
-        Environment = 3,
     }
 
 } 

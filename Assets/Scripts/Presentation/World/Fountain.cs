@@ -5,11 +5,25 @@ using UnityEngine;
 
 namespace DeepseaOil.Presentation.World
 {
-    // 由组合根每帧推进，不是自驱 Update；只认识 IDropSpawner 一个方法
+
+    public enum FountainKind
+    {
+
+        Water = 0,
+
+        Earth = 1,
+
+        Life = 2,
+    }
+
     public sealed class Fountain : MonoBehaviour
     {
+        [Header("种类")]
+        [Tooltip("泉眼种类：Water/Earth 补弹药并吐落物，Life 只做静止回血")]
+        [SerializeField] private FountainKind kind = FountainKind.Water;
+
         [Header("产出")]
-        [Tooltip("产出的间隔（秒）")]
+        [Tooltip("产出的间隔（秒）。Life 泉不使用")]
         [SerializeField] private float spawnInterval = 1f;
 
         [Tooltip("（可选）触发区可视半径提示。玩家进出时显隐")]
@@ -22,20 +36,43 @@ namespace DeepseaOil.Presentation.World
         [Tooltip("落点离喷泉的最小距离（世界单位）：避免水球落在喷泉正中心")]
         [SerializeField] private float minLandingDistance = 0.8f;
 
-        // 为 null 时不产出；Attach 由组合根调一次
+        [Header("触发区")]
+        [Tooltip("自动补 Trigger 时的半径（世界单位）：1.5 覆盖以泉眼为中心的九宫格")]
+        [SerializeField] private float autoTriggerRadius = 1.5f;
+
         private IDropSpawner _spawner;
 
         private bool _playerInside;
         private float _spawnTimer;
+
+        public FountainKind Kind => kind;
+
+        public bool PlayerInside => _playerInside;
 
         public void Attach(IDropSpawner spawner)
         {
             _spawner = spawner;
         }
 
-        // 推进一个渲染帧；deltaTime 暂停时为 0，节拍自然冻结
+        private void Awake()
+        {
+            EnsureTrigger();
+        }
+
+        private void EnsureTrigger()
+        {
+            if (GetComponent<Collider2D>() != null) return;
+
+            var circle = gameObject.AddComponent<CircleCollider2D>();
+
+            circle.isTrigger = true;
+            circle.radius = autoTriggerRadius > 0f ? autoTriggerRadius : 1.5f;
+        }
+
         public void Tick(float deltaTime)
         {
+            if (kind == FountainKind.Life) return;
+
             if (!_playerInside) return;
 
             _spawnTimer += deltaTime;
@@ -73,7 +110,9 @@ namespace DeepseaOil.Presentation.World
             if (radiusView != null) radiusView.SetActive(false);
         }
 
-        // 没接线时不产出也不报错，装配日志已由 CombatRoot 报过
+        public DropType OutputType
+            => kind == FountainKind.Earth ? DropType.Earth : DropType.Water;
+
         private void SpawnOne()
         {
             if (_spawner == null) return;
@@ -81,10 +120,9 @@ namespace DeepseaOil.Presentation.World
             Vector2 center = transform.position;
             Vector2 landing = center + RandomLandingOffset();
 
-            _spawner.TrySpawn(new DropSpawnRequest(DropType.Water, center, landing));
+            _spawner.TrySpawn(new DropSpawnRequest(OutputType, center, landing));
         }
 
-        // 上限 MaxLandingAttempts 次，避免最小距离>最大半径时死循环
         private Vector2 RandomLandingOffset()
         {
             const int MaxLandingAttempts = 8;

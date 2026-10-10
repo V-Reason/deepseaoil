@@ -2,100 +2,11 @@
   {
     "id": 0,
     "name": "纯水",
-    "type": 0,
-    "temp": 0,
-    "wet": 3,
-    "conductive": 1,
-    "tags": 0
+    "type": 0
   },
   {
     "id": 1,
-    "name": "热水",
-    "type": 0,
-    "temp": 3,
-    "wet": 3,
-    "conductive": 1,
-    "tags": 0
-  },
-  {
-    "id": 2,
-    "name": "冷水",
-    "type": 0,
-    "temp": -2,
-    "wet": 3,
-    "conductive": 1,
-    "tags": 0
-  },
-  {
-    "id": 3,
-    "name": "干土",
-    "type": 1,
-    "temp": 0,
-    "wet": 0,
-    "conductive": 0,
-    "tags": 1
-  },
-  {
-    "id": 4,
-    "name": "湿土",
-    "type": 1,
-    "temp": 0,
-    "wet": 2,
-    "conductive": 1,
-    "tags": 1
-  },
-  {
-    "id": 5,
-    "name": "沙",
-    "type": 1,
-    "temp": 1,
-    "wet": 0,
-    "conductive": 0,
-    "tags": 2
-  },
-  {
-    "id": 6,
-    "name": "粘土",
-    "type": 1,
-    "temp": 0,
-    "wet": 0,
-    "conductive": 0,
-    "tags": 1
-  },
-  {
-    "id": 7,
-    "name": "冰种子",
-    "type": 2,
-    "temp": -4,
-    "wet": 1,
-    "conductive": 0,
-    "tags": 0
-  },
-  {
-    "id": 8,
-    "name": "火种子",
-    "type": 2,
-    "temp": 4,
-    "wet": 0,
-    "conductive": 0,
-    "tags": 0
-  },
-  {
-    "id": 9,
-    "name": "植物种子",
-    "type": 2,
-    "temp": 0,
-    "wet": 2,
-    "conductive": 0,
-    "tags": 4
-  },
-  {
-    "id": 10,
-    "name": "电种子",
-    "type": 2,
-    "temp": 1,
-    "wet": 0,
-    "conductive": 2,
-    "tags": 0
+    "name": "纯土",
+    "type": 1
   }
 ]

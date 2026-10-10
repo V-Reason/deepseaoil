@@ -24,6 +24,7 @@ public sealed partial class Enemy : Luban.BeanBase
         { if(!_buf["name"].IsString) { throw new SerializationException(); }  Name = _buf["name"]; }
         { if(!_buf["max_speed"].IsNumber) { throw new SerializationException(); }  MaxSpeed = _buf["max_speed"]; }
         { if(!_buf["hp"].IsNumber) { throw new SerializationException(); }  Hp = _buf["hp"]; }
+        { if(!_buf["contact_damage"].IsNumber) { throw new SerializationException(); }  ContactDamage = _buf["contact_damage"]; }
     }
 
     public static Enemy DeserializeEnemy(JSONNode _buf)
@@ -47,6 +48,10 @@ public sealed partial class Enemy : Luban.BeanBase
     /// 耐久
     /// </summary>
     public readonly int Hp;
+    /// <summary>
+    /// 贴身一次造成的伤害
+    /// </summary>
+    public readonly int ContactDamage;
    
     public const int __ID__ = -684392006;
     public override int GetTypeId() => __ID__;
@@ -62,6 +67,7 @@ public sealed partial class Enemy : Luban.BeanBase
         + "name:" + Name + ","
         + "maxSpeed:" + MaxSpeed + ","
         + "hp:" + Hp + ","
+        + "contactDamage:" + ContactDamage + ","
         + "}";
     }
 }

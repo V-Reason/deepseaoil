@@ -6,9 +6,14 @@
     "contact_damage": 1,
     "invulnerable_duration": 0.8,
     "retry_delay": 1.2,
-    "attack_interval": 0.5,
+    "attack_interval": 0.35,
     "knockback_impulse": 12,
     "knockback_speed_limit": 12,
-    "contact_radius": 1
+    "contact_radius": 1,
+    "water_capacity": 5,
+    "water_start": 5,
+    "earth_capacity": 5,
+    "earth_start": 5,
+    "life_heal_interval": 3
   }
 ]

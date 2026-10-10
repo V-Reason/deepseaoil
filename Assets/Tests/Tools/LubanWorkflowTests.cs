@@ -201,6 +201,49 @@ namespace DeepseaOil.EditorTools.Tests
         }
 
         // ================================================================
+        // 6 · 输入动作表契约
+        //
+        // 为什么用 JSON 直读而不是 InputActionAsset.FromJson：
+        //   只需断言"资产里确实有这些动作与绑定"。用资产 API 会把断言绑到 Unity 的
+        //   资产加载时机上（Test Runner 里带 .meta 的资源加载路径更脆），而这里要守的
+        //   是**文件内容**的契约：少一个动作，InputProvider 的 FindAction 会当场报错、
+        //   对应输入永久失效。
+        // ================================================================
+
+        /// <summary>战斗动作 → 必须存在的绑定路径。改键位表就要同步改这里。</summary>
+        static readonly Dictionary<string, string> RequiredPlayerBindings = new Dictionary<string, string>
+        {
+            { "Move", "2DVector" },
+            { "Dash", "<Keyboard>/leftShift" },
+            { "Attack", "<Mouse>/leftButton" },
+            { "AltAttack", "<Mouse>/rightButton" },
+            { "Plant", "<Keyboard>/e" },
+            { "Aim", "<Mouse>/position" },
+        };
+
+        [Test]
+        public void 输入动作表_含全部战斗动作与绑定()
+        {
+            string path = Path.Combine(Application.dataPath, "Scripts", "Presentation", "Input", "InputSys.inputactions");
+
+            Assert.IsTrue(File.Exists(path), "找不到输入动作表：" + path);
+
+            string json = File.ReadAllText(path);
+
+            // 逐个动作断言：用简单的字符串扫描而不是 JSON 解析，避免引第三方解析器
+            foreach (var pair in RequiredPlayerBindings)
+            {
+                Assert.IsTrue(
+                    json.Contains("\"name\": \"" + pair.Key + "\""),
+                    $"InputSys.inputactions 里没有动作 {pair.Key}：InputProvider 的 FindAction 会当场报错，该输入永久失效");
+
+                Assert.IsTrue(
+                    json.Contains("\"path\": \"" + pair.Value + "\"") && json.Contains("\"action\": \"" + pair.Key + "\""),
+                    $"动作 {pair.Key} 没有绑定到 {pair.Value}");
+            }
+        }
+
+        // ================================================================
         // 辅助
         // ================================================================
 

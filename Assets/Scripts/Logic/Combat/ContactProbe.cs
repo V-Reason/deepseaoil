@@ -4,12 +4,12 @@ using DeepseaOil.Logic.Grid;
 
 namespace DeepseaOil.Logic.Combat
 {
-    // 接触检测纯函数：取贴在玩家身上的最近者；伤害值由调用方取自 PlayerSpec.ContactDamage。
-    // 按九宫格查，3×3 覆盖半径1（格边长1）；判定半径取表值 contact_radius，比例变了要同步改。
+    // 接触检测纯函数：取贴在玩家身上的最近者，
+    // 按九宫格查，3×3 覆盖半径1（格边长1）；
     // 已死目标不算接触（同 GridLogic.Deal）。
     public static class ContactProbe
     {
-        // cellBuffer 复用缓冲（先清空）；contactRadius 世界单位，非法值按 0。
+        // cellBuffer 复用缓冲（先清空）；
         public static bool TryFindAttacker(
             Vector3Int playerCell,
             Vector2 playerPosition,
@@ -17,34 +17,45 @@ namespace DeepseaOil.Logic.Combat
             EnemyCellRegistry registry,
             List<Vector3Int> cellBuffer,
             out Vector2 attacker,
-            out float distance)
+            out float distance,
+            out int contactDamage,
+            out IEffectTarget attackerTarget)
         {
             attacker = default;
             distance = float.PositiveInfinity;
+            contactDamage = 0;
+            attackerTarget = null;
 
             if (registry == null || cellBuffer == null) return false;
 
             float radius = float.IsNaN(contactRadius) || contactRadius < 0f ? 0f : contactRadius;
             float radiusSqr = radius * radius;
 
-            bool found = false;
             float bestSqr = float.MaxValue;
 
             // 邻居查询不含自己，中心格单独看
-            found = ScanCell(playerCell, playerPosition, radiusSqr, registry, ref bestSqr, ref attacker);
+            bool found = ScanCell(playerCell, playerPosition, radiusSqr, registry, ref bestSqr, ref attacker, ref attackerTarget);
 
             GridQuery.GetNeighbors8(playerCell, cellBuffer);
 
             for (int i = 0; i < cellBuffer.Count; i++)
             {
-                if (ScanCell(cellBuffer[i], playerPosition, radiusSqr, registry, ref bestSqr, ref attacker)) found = true;
+                if (ScanCell(cellBuffer[i], playerPosition, radiusSqr, registry, ref bestSqr, ref attacker, ref attackerTarget)) found = true;
             }
 
             if (!found) return false;
 
             distance = Mathf.Sqrt(bestSqr);
 
+            contactDamage = ContactDamageOf(attackerTarget);
+
             return true;
+        }
+
+        // 伤害值出口：敌人侧只暴露 IContactDamager，
+        private static int ContactDamageOf(IEffectTarget target)
+        {
+            return target is IContactDamager damager ? damager.ContactDamage : 0;
         }
 
         private static bool ScanCell(
@@ -53,7 +64,8 @@ namespace DeepseaOil.Logic.Combat
             float radiusSqr,
             EnemyCellRegistry registry,
             ref float bestSqr,
-            ref Vector2 attacker)
+            ref Vector2 attacker,
+            ref IEffectTarget bestTarget)
         {
             if (!registry.TryGetIn(cell, out List<IEffectTarget> targets) || targets == null) return false;
 
@@ -63,7 +75,7 @@ namespace DeepseaOil.Logic.Combat
             {
                 IEffectTarget target = targets[i];
 
-                // 已销毁的 Unity 对象在接口引用上不是 null，直接读会抛 MissingReferenceException。
+                // 已销毁的 Unity 对象在接口引用上不是 null，
                 if (target is UnityEngine.Object unityObject && unityObject == null) continue;
 
                 if (target == null) continue;
@@ -78,10 +90,17 @@ namespace DeepseaOil.Logic.Combat
 
                 bestSqr = sqr;
                 attacker = target.Position;
+                bestTarget = target;
                 found = true;
             }
 
             return found;
         }
+    }
+
+    // <summary>贴身伤害的来源：由敌人自己提供</summary>
+    public interface IContactDamager
+    {
+        int ContactDamage { get; }
     }
 }

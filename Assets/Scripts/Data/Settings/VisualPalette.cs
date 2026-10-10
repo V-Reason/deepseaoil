@@ -4,7 +4,7 @@ using cfg.dso;
 namespace DeepseaOil.Data
 {
     /// <summary>战斗表现件颜色表；观感参数一律走 SO，不对策划暴露</summary>
-    /// <remarks>球种色只有一份（球本体/落地环/HUD 图标三个消费者）；敌人四态色显式写出，不做乘法或插值；丢资产时给字段默认值实例＋Warning，退回白模色而非透明</remarks>
+
     [CreateAssetMenu(fileName = "VisualPalette", menuName = "DeepseaOil/Settings/VisualPalette")]
     public sealed class VisualPalette : ScriptableObject
     {
@@ -81,6 +81,17 @@ namespace DeepseaOil.Data
             {
                 case BallType.Water: return waterBall;
                 case BallType.Earth: return earthBall;
+                default: return unknownBall;
+            }
+        }
+
+        /// <summary>掉落物颜色；与球同色（掉落物就是材料本身），种子件走 unknownBall 以免误导</summary>
+        public Color DropColor(DropType type)
+        {
+            switch (type)
+            {
+                case DropType.Water: return waterBall;
+                case DropType.Earth: return earthBall;
                 default: return unknownBall;
             }
         }

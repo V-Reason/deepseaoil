@@ -1,3 +1,4 @@
+using DeepseaOil.Data;
 using DeepseaOil.Foundation;
 using DeepseaOil.Logic.Combat;
 using DeepseaOil.Logic.Events;
@@ -7,7 +8,7 @@ using cfg.dso;
 
 namespace DeepseaOil.Logic.Player
 {
-    /// <summary>战斗层：瞄准+投掷资格（弹药/冷却）+投掷意图；PlayerController.RenderTick 每渲染帧驱动；时钟 Time.time，与移动层 Time.fixedTime 混用会让冷却忽长忽短</summary>
+
     public sealed class CombatGroup
     {
         private readonly PlayerLogic _logic;
@@ -58,8 +59,8 @@ namespace DeepseaOil.Logic.Player
             HasAim = hasAim;
             AimCell = hasAim ? cell : default;
 
-            // 高亮口径：射程内+冷却就绪+有水球；土球是副攻击不吃弹药
-            AimAvailable = hasAim && _throwCooldown.CanUse(now) && _logic.Stats.WaterBallCount > 0;
+            // 高亮口径：射程内 + 冷却就绪 + 水弹够；土弹走副攻击，各自判各自的弹药
+            AimAvailable = hasAim && _throwCooldown.CanUse(now) && _logic.Stats.Water > 0;
 
             PublishIfChanged();
         }
@@ -74,19 +75,26 @@ namespace DeepseaOil.Logic.Player
         }
 
         /// <summary>投掷意图，采纳由世界侧裁决</summary>
-        /// <remarks>被拒绝时不扣弹药不进冷却</remarks>
+        /// <remarks>被拒绝时不扣弹药不进冷却。水与土各自消耗自己的弹药池。</remarks>
         public bool RequestThrow(BallType ball, float now)
         {
             if (!HasAim) return false;
             if (!_throwCooldown.CanUse(now)) return false;
-            if (ball == BallType.Water && _logic.Stats.WaterBallCount <= 0) return false;
             if (_sink == null) return false;
+
+            ProjectileSpec definition = ConfigModule.GetBall(ball);
+
+            if (definition == null) return false;
+
+            if (!definition.TryGetResource(out ResourceKind kind)) return false;
+
+            if (_logic.Stats.AmountOf(kind) <= 0) return false;
 
             var intent = new ThrowIntent(ball, AimCell, _origin, _geometry.CellCenter(AimCell));
 
             if (!_sink.RequestThrow(in intent)) return false;
 
-            if (ball == BallType.Water) _logic.Stats.TryConsumeWater(1);
+            _logic.Stats.TryConsume(kind);
 
             _throwCooldown.MarkUsed(now, _logic.Stats.Spec.AttackInterval);
 

@@ -62,6 +62,9 @@ namespace DeepseaOil.Presentation
 
         public WorldInfo World => _world;
 
+        /// <summary>输入采样器；战斗组合根据此读播种键与移动输入</summary>
+        public InputProvider Input => inputProvider;
+
         /// <summary>引擎回读速度，滞后一个物理步</summary>
         public Vector2 EngineVelocity => motor == null ? Vector2.zero : motor.EngineVelocity;
 
@@ -237,7 +240,7 @@ namespace DeepseaOil.Presentation
         }
 
         /// <summary>渲染帧：瞄准与开火意图，由 GameRoot.Update 按 Order 驱动</summary>
-        /// <remarks>瞄准不吃也不产物理量，故放渲染帧；屏幕→世界只有本类能做，算完把世界点交逻辑层算吸附格。暂停只认 InputProvider.IsInputEnabled 一个真值。</remarks>
+
         public void RenderTick(float deltaTime)
         {
             if (Logic == null) return;
@@ -286,7 +289,6 @@ namespace DeepseaOil.Presentation
             body.sortingOrder = RenderOrder.ActorOrder(Position.y);
         }
 
-        /// <summary>屏幕点→世界点；不读相机 z，它被 Cinemachine 每帧驱动，用足够大的常量深度更稳，见 ThrowTuning.cameraPlaneDepth</summary>
         private Vector2 AimWorldPoint(Camera camera)
         {
             Vector2 screen = inputProvider.AimScreen;

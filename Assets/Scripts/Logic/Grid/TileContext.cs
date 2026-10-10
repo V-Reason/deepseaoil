@@ -4,7 +4,7 @@ using DeepseaOil.Data;
 
 namespace DeepseaOil.Logic.Grid
 {
-    /// <summary>一次 Tick/状态切换可见的上下文：格子身份、时间、两个端口；时间由驱动方给，状态不读 Time，暂停时 DeltaTime 为 0 冻结</summary>
+    // <summary>一次 Tick/状态切换可见的上下文：格子身份、时间</summary>
     public readonly struct TileContext
     {
         public readonly Vector3Int Cell;
@@ -40,18 +40,22 @@ namespace DeepseaOil.Logic.Grid
         void ScheduleTick(Vector3Int cell);
 
         void Transition(Vector3Int cell, TileStateType next);
+
+        /// <summary>直接切状态（同步、同帧生效）；durationOverride &gt; 0 时覆盖表里的存活秒数</summary>
+        bool SwitchTileState(Vector3Int cell, TileStateType next, float durationOverride = 0f);
     }
 
-    /// <summary>唯一效果出口：对格上目标施加一次效果，找人与击退由实现负责；只收已定值的 TileEffectValue，档位/级别在数据层已消解</summary>
+    /// <summary>状态的施加出口：找目标、算方向、判死活都在实现侧；状态只提交"对谁做什么"</summary>
     public interface ITileResolver
     {
-        void Apply(Vector3Int cell, in TileEffectValue effect);
+        /// <summary>对格上目标造成一次伤害</summary>
+        void DealCell(Vector3Int cell, float amount);
 
-        /// <summary>地形改写通道：改格子自身而非格上目标；温湿度继承、清除植物、状态转换都走这里；与 Apply 分开，状态不许直接碰别的格，跨格由执行者做</summary>
-        void ApplyToCell(Vector3Int cell, in TileEffectValue effect);
+        /// <summary>对格上目标续一次减速；seconds 是续命窗口，按帧调用时就是本帧 Δt</summary>
+        void ApplySlowCell(Vector3Int cell, float speedScale, float seconds);
 
-        /// <summary>直接改写某格元素四件；比 ApplyToCell 更窄，只写值</summary>
-        void SetCellElement(Vector3Int cell, in ElementValue element);
+        /// <summary>对格上目标施加麻痹</summary>
+        void ApplyStunCell(Vector3Int cell, float seconds);
     }
 
     /// <summary>会被减速修饰影响的目标；当前只有敌人实现</summary>

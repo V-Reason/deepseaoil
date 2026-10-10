@@ -30,11 +30,14 @@ namespace DeepseaOil.Data
         private static VisualPalette _visuals;
         private static EnemyTuning _enemyTuning;
 
-        /// <summary>地块效果缓存，效果号→包装件；装配期装一次，此后只读</summary>
-        private static Dictionary<TileEffectType, TileEffectSpec> _tileEffects;
-
-        /// <summary>元素反应规则，列表顺序即匹配优先级；装配期折算，此后只读</summary>
+        /// <summary>元素反应规则，装配期折成 (原格, 球种) 哈希表；此后只读</summary>
         private static IReadOnlyList<ElementRuleSpec> _elementRules;
+
+        /// <summary>二级元素反应查询表，装配期建一次；此后只读</summary>
+        private static DuoReactionCatalog _duoReactions;
+
+        /// <summary>种子基建配置，种子号→包装件；装配期装一次，此后只读</summary>
+        private static Dictionary<SeedType, SeedSpec> _seeds;
 
         public static bool IsReady => _ready;
 
@@ -129,9 +132,13 @@ namespace DeepseaOil.Data
             _ = GetWave();
             _ = GetDrop();
 
-            // 元素层与地块效果两张表也在启动期走一遍：少一行、少一档在这里炸
+            // 元素层与种子表也在启动期走一遍：少一行、少一条规则在这里炸，而不是等第一次投掷
             _ = GetElementRules();
-            _ = GetTileEffects();
+            _ = GetDuoReactions();
+            _ = GetAllSeeds();
+
+            // 精英怪是预留行：表里有就必须折得出来（多敌种刷怪接上前不能静默缺数据）
+            _ = GetEnemy(2);
         }
 
         // 玩法数值查询（包装件：表行 ＋ SO）。边界：id 不存在时 Luban 的 Get 抛异常这里不 catch —— 配置事故应在启动期炸出来
@@ -167,7 +174,7 @@ namespace DeepseaOil.Data
         {
             EnsureAssets();
 
-            return new TileStateSpec(_holder.Tables.TbTileState.Get(id), ResolveEffect);
+            return new TileStateSpec(_holder.Tables.TbTileState.Get(id));
         }
 
         /// <summary>读一个格子状态，表里没有这一行时返回 null 不抛异常：给按 ID 造状态的工厂判断该 ID 有没有实现</summary>
@@ -177,7 +184,7 @@ namespace DeepseaOil.Data
 
             TileState row = _holder.Tables.TbTileState.GetOrDefault(id);
 
-            return row != null ? new TileStateSpec(row, ResolveEffect) : null;
+            return row != null ? new TileStateSpec(row) : null;
         }
 
         public static IReadOnlyList<TileStateSpec> GetAllTileStates()
@@ -190,40 +197,13 @@ namespace DeepseaOil.Data
 
             for (int i = 0; i < rows.Count; i++)
             {
-                result.Add(new TileStateSpec(rows[i], ResolveEffect));
+                result.Add(new TileStateSpec(rows[i]));
             }
 
             return result;
         }
 
-        /// <summary>全部地块效果（tile_effect 表），效果号→多档参数；装配期折算一次此后只读，调表后须重启</summary>
-        public static IReadOnlyList<TileEffectSpec> GetTileEffects()
-        {
-            EnsureAssets();
-
-            EnsureTileEffects();
-
-            var result = new List<TileEffectSpec>(_tileEffects.Count);
-
-            foreach (KeyValuePair<TileEffectType, TileEffectSpec> pair in _tileEffects)
-            {
-                result.Add(pair.Value);
-            }
-
-            return result;
-        }
-
-        /// <summary>读一个地块效果，表里没有这个效果号时返回 null</summary>
-        public static TileEffectSpec GetTileEffect(TileEffectType id)
-        {
-            EnsureAssets();
-
-            EnsureTileEffects();
-
-            return _tileEffects.TryGetValue(id, out TileEffectSpec spec) ? spec : null;
-        }
-
-        /// <summary>全部元素反应规则（element_rule 表），返回顺序即匹配优先级</summary>
+        /// <summary>全部元素反应规则（element_rule 表）；顺序无语义，查询由 ReactionResolver 的哈希表负责</summary>
         public static IReadOnlyList<ElementRuleSpec> GetElementRules()
         {
             EnsureAssets();
@@ -236,12 +216,60 @@ namespace DeepseaOil.Data
 
             for (int i = 0; i < rows.Count; i++)
             {
-                rules.Add(new ElementRuleSpec(rows[i], ResolveEffect));
+                rules.Add(new ElementRuleSpec(rows[i]));
             }
 
             _elementRules = rules;
 
             return _elementRules;
+        }
+
+        /// <summary>二级元素跨界反应查询表；装配期建一次此后只读，调表后须重启</summary>
+        public static DuoReactionCatalog GetDuoReactions()
+        {
+            EnsureAssets();
+
+            if (_duoReactions != null) return _duoReactions;
+
+            IReadOnlyList<ElementDuoReaction> rows = _holder.Tables.TbElementDuoReaction.DataList;
+
+            var rules = new List<DuoReactionSpec>(rows.Count);
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                rules.Add(new DuoReactionSpec(rows[i]));
+            }
+
+            _duoReactions = new DuoReactionCatalog(rules);
+
+            return _duoReactions;
+        }
+
+        /// <summary>读一个种子，表里没有这一行时返回 null 不抛异常</summary>
+        public static SeedSpec GetSeed(SeedType id)
+        {
+            EnsureAssets();
+
+            EnsureSeeds();
+
+            return _seeds.TryGetValue(id, out SeedSpec spec) ? spec : null;
+        }
+
+        /// <summary>全部种子配置；返回新列表，装配期用一次即可</summary>
+        public static IReadOnlyList<SeedSpec> GetAllSeeds()
+        {
+            EnsureAssets();
+
+            EnsureSeeds();
+
+            var result = new List<SeedSpec>(_seeds.Count);
+
+            foreach (KeyValuePair<SeedType, SeedSpec> pair in _seeds)
+            {
+                result.Add(pair.Value);
+            }
+
+            return result;
         }
 
         /// <summary>读一个敌人种类：耐久来自 enemy 表，运动学与半径来自 EnemyTuning</summary>
@@ -282,6 +310,23 @@ namespace DeepseaOil.Data
             return new WaveSpec(_holder.Tables.TbWave.Get(id));
         }
 
+        /// <summary>全部波次配置，按表内顺序；WaveLogic 逐波推进，跑完循环回第 1 行</summary>
+        public static IReadOnlyList<WaveSpec> GetWaves()
+        {
+            EnsureAssets();
+
+            IReadOnlyList<Wave> rows = _holder.Tables.TbWave.DataList;
+
+            var result = new List<WaveSpec>(rows.Count);
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                result.Add(new WaveSpec(rows[i]));
+            }
+
+            return result;
+        }
+
         /// <summary>全部关卡初始格子状态，返回生成行供一次性遍历；表当前 0 行，不要因表空删链</summary>
         public static IReadOnlyList<TileInitial> GetTileInitials()
         {
@@ -290,11 +335,12 @@ namespace DeepseaOil.Data
             return _holder.Tables.TbTileInitial.DataList;
         }
 
-        public static DropSpec GetDrop()
+        /// <summary>取一种掉落物的数值；种类没有独立数值行，全部共用 DropTuning，差异只在颜色与载荷</summary>
+        public static DropSpec GetDrop(DropType type = DropType.Water)
         {
             EnsureAssets();
 
-            return new DropSpec(_dropTuning);
+            return new DropSpec(_dropTuning, type);
         }
 
         // 逃生舱：特殊情况直接访问原始 Tables
@@ -312,43 +358,25 @@ namespace DeepseaOil.Data
             }
         }
 
-        // 「生成行不出 Data 层」判据：放行生成枚举（BallType / TileStateType）；禁止生成行（Projectile / Enemy / Player / Wave / TileState / TileInitial 等），这类引用只准出现在 Data/Config/**；例外必须在此登记，当前为零
-
         private static void EnsureReady()
         {
             if (!_ready)
                 throw new InvalidOperationException("[Config] accessed before Init");
         }
 
-        /// <summary>地块效果取值缓存，首次访问装一次</summary>
-        private static void EnsureTileEffects()
+        /// <summary>种子配置缓存，首次访问装一次</summary>
+        private static void EnsureSeeds()
         {
-            if (_tileEffects != null) return;
+            if (_seeds != null) return;
 
-            IReadOnlyList<cfg.dso.TileEffect> rows = _holder.Tables.TbTileEffect.DataList;
+            IReadOnlyList<Seed> rows = _holder.Tables.TbSeed.DataList;
 
-            _tileEffects = new Dictionary<TileEffectType, TileEffectSpec>(rows.Count);
+            _seeds = new Dictionary<SeedType, SeedSpec>(rows.Count);
 
             for (int i = 0; i < rows.Count; i++)
             {
-                _tileEffects[rows[i].Id] = new TileEffectSpec(rows[i]);
+                _seeds[rows[i].Id] = new SeedSpec(rows[i]);
             }
-        }
-
-        /// <summary>「效果号＋档位 → 已定值 TileEffectValue」的唯一解析点，TileStateSpec 与 ElementRuleSpec 都经它折算</summary>
-        /// <remarks>档位越界由 TileEffectSpec.GetEffect 报 Warning 并夹到第 1 档；效果号不在表里返回 None（配置事故，表现为这条效果没发生）</remarks>
-        private static TileEffectValue ResolveEffect(TileEffectType effect, int pos)
-        {
-            EnsureTileEffects();
-
-            if (!_tileEffects.TryGetValue(effect, out TileEffectSpec spec))
-            {
-                Debug.LogWarning($"[Config] tile_effect 表里没有效果 {effect}（规则 / 状态里引用了它）：这条效果被忽略。");
-
-                return default;
-            }
-
-            return spec.GetEffect(pos);
         }
 
         /// <remarks>刻意分开报错：只报"没 Init"会把"忘了调 BindAssets"掩盖成同一现象，而两种装配错误的修法完全不同</remarks>

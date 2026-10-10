@@ -20,17 +20,14 @@ public sealed partial class ElementRule : Luban.BeanBase
 {
     public ElementRule(JSONNode _buf) 
     {
-        { if(!_buf["priority"].IsNumber) { throw new SerializationException(); }  Priority = _buf["priority"]; }
-        { if(!_buf["result_id"].IsNumber) { throw new SerializationException(); }  ResultId = (dso.TileStateType)_buf["result_id"].AsInt; }
-        { var __json0 = _buf["effects"]; if(!__json0.IsArray) { throw new SerializationException(); } Effects = new System.Collections.Generic.List<dso.TileEffectType>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { dso.TileEffectType __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = (dso.TileEffectType)__e0.AsInt; }  Effects.Add(__v0); }   }
-        { var __json0 = _buf["effectValuePos"]; if(!__json0.IsArray) { throw new SerializationException(); } EffectValuePos = new System.Collections.Generic.List<int>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { int __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = __e0; }  EffectValuePos.Add(__v0); }   }
-        { if(!_buf["requireTag"].IsNumber) { throw new SerializationException(); }  RequireTag = (dso.ElementTag)_buf["requireTag"].AsInt; }
-        { if(!_buf["excludeTag"].IsNumber) { throw new SerializationException(); }  ExcludeTag = (dso.ElementTag)_buf["excludeTag"].AsInt; }
-        { if(!_buf["requireTempMin"].IsNumber) { throw new SerializationException(); }  RequireTempMin = _buf["requireTempMin"]; }
-        { if(!_buf["requireTempMax"].IsNumber) { throw new SerializationException(); }  RequireTempMax = _buf["requireTempMax"]; }
-        { if(!_buf["requireWetMin"].IsNumber) { throw new SerializationException(); }  RequireWetMin = _buf["requireWetMin"]; }
-        { if(!_buf["requireWetMax"].IsNumber) { throw new SerializationException(); }  RequireWetMax = _buf["requireWetMax"]; }
-        { if(!_buf["requireCondMin"].IsNumber) { throw new SerializationException(); }  RequireCondMin = _buf["requireCondMin"]; }
+        { if(!_buf["id"].IsNumber) { throw new SerializationException(); }  Id = _buf["id"]; }
+        { if(!_buf["source_tile"].IsNumber) { throw new SerializationException(); }  SourceTile = (dso.TileStateType)_buf["source_tile"].AsInt; }
+        { if(!_buf["ball_type"].IsNumber) { throw new SerializationException(); }  BallType = (dso.BallType)_buf["ball_type"].AsInt; }
+        { if(!_buf["result_tile"].IsNumber) { throw new SerializationException(); }  ResultTile = (dso.TileStateType)_buf["result_tile"].AsInt; }
+        { if(!_buf["impact_damage"].IsNumber) { throw new SerializationException(); }  ImpactDamage = _buf["impact_damage"]; }
+        { if(!_buf["impact_knockback"].IsNumber) { throw new SerializationException(); }  ImpactKnockback = _buf["impact_knockback"]; }
+        { if(!_buf["impact_stun"].IsNumber) { throw new SerializationException(); }  ImpactStun = _buf["impact_stun"]; }
+        { if(!_buf["trigger_chain"].IsBoolean) { throw new SerializationException(); }  TriggerChain = _buf["trigger_chain"]; }
     }
 
     public static ElementRule DeserializeElementRule(JSONNode _buf)
@@ -39,46 +36,37 @@ public sealed partial class ElementRule : Luban.BeanBase
     }
 
     /// <summary>
-    /// 优先级
+    /// 编号
     /// </summary>
-    public readonly int Priority;
+    public readonly int Id;
     /// <summary>
-    /// 对应生成的地形
+    /// 原格状态
     /// </summary>
-    public readonly dso.TileStateType ResultId;
-    public readonly System.Collections.Generic.List<dso.TileEffectType> Effects;
+    public readonly dso.TileStateType SourceTile;
     /// <summary>
-    /// 生成的效果
+    /// 投入小球
     /// </summary>
-    public readonly System.Collections.Generic.List<int> EffectValuePos;
+    public readonly dso.BallType BallType;
     /// <summary>
-    /// 必须有的标签
+    /// 生成地貌
     /// </summary>
-    public readonly dso.ElementTag RequireTag;
+    public readonly dso.TileStateType ResultTile;
     /// <summary>
-    /// 必须排除的标签
+    /// 瞬时伤害
     /// </summary>
-    public readonly dso.ElementTag ExcludeTag;
+    public readonly int ImpactDamage;
     /// <summary>
-    /// 温度下限
+    /// 击退距离(格)
     /// </summary>
-    public readonly int RequireTempMin;
+    public readonly float ImpactKnockback;
     /// <summary>
-    /// 温度上限
+    /// 麻痹时间(秒)
     /// </summary>
-    public readonly int RequireTempMax;
+    public readonly float ImpactStun;
     /// <summary>
-    /// 湿度下限
+    /// 触发网格连锁
     /// </summary>
-    public readonly int RequireWetMin;
-    /// <summary>
-    /// 湿度上限
-    /// </summary>
-    public readonly int RequireWetMax;
-    /// <summary>
-    /// 最小导电要求(-1代表没有
-    /// </summary>
-    public readonly int RequireCondMin;
+    public readonly bool TriggerChain;
    
     public const int __ID__ = -391737142;
     public override int GetTypeId() => __ID__;
@@ -90,17 +78,14 @@ public sealed partial class ElementRule : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "priority:" + Priority + ","
-        + "resultId:" + ResultId + ","
-        + "effects:" + Luban.StringUtil.CollectionToString(Effects) + ","
-        + "effectValuePos:" + Luban.StringUtil.CollectionToString(EffectValuePos) + ","
-        + "requireTag:" + RequireTag + ","
-        + "excludeTag:" + ExcludeTag + ","
-        + "requireTempMin:" + RequireTempMin + ","
-        + "requireTempMax:" + RequireTempMax + ","
-        + "requireWetMin:" + RequireWetMin + ","
-        + "requireWetMax:" + RequireWetMax + ","
-        + "requireCondMin:" + RequireCondMin + ","
+        + "id:" + Id + ","
+        + "sourceTile:" + SourceTile + ","
+        + "ballType:" + BallType + ","
+        + "resultTile:" + ResultTile + ","
+        + "impactDamage:" + ImpactDamage + ","
+        + "impactKnockback:" + ImpactKnockback + ","
+        + "impactStun:" + ImpactStun + ","
+        + "triggerChain:" + TriggerChain + ","
         + "}";
     }
 }

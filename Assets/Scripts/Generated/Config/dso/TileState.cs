@@ -23,14 +23,10 @@ public sealed partial class TileState : Luban.BeanBase
         { if(!_buf["id"].IsNumber) { throw new SerializationException(); }  Id = (dso.TileStateType)_buf["id"].AsInt; }
         { if(!_buf["name"].IsString) { throw new SerializationException(); }  Name = _buf["name"]; }
         { if(!_buf["duration"].IsNumber) { throw new SerializationException(); }  Duration = _buf["duration"]; }
-        { if(!_buf["canReact"].IsBoolean) { throw new SerializationException(); }  CanReact = _buf["canReact"]; }
-        { if(!_buf["temp"].IsNumber) { throw new SerializationException(); }  Temp = _buf["temp"]; }
-        { if(!_buf["wet"].IsNumber) { throw new SerializationException(); }  Wet = _buf["wet"]; }
-        { if(!_buf["cond"].IsNumber) { throw new SerializationException(); }  Cond = _buf["cond"]; }
-        { if(!_buf["tags"].IsNumber) { throw new SerializationException(); }  Tags = (dso.ElementTag)_buf["tags"].AsInt; }
-        { var __json0 = _buf["effects"]; if(!__json0.IsArray) { throw new SerializationException(); } Effects = new System.Collections.Generic.List<dso.TileEffectType>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { dso.TileEffectType __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = (dso.TileEffectType)__e0.AsInt; }  Effects.Add(__v0); }   }
-        { var __json0 = _buf["effectValuePos"]; if(!__json0.IsArray) { throw new SerializationException(); } EffectValuePos = new System.Collections.Generic.List<int>(__json0.Count); foreach(JSONNode __e0 in __json0.Children) { int __v0;  { if(!__e0.IsNumber) { throw new SerializationException(); }  __v0 = __e0; }  EffectValuePos.Add(__v0); }   }
-        { if(!_buf["tip"].IsString) { throw new SerializationException(); }  Tip = _buf["tip"]; }
+        { if(!_buf["slow_rate"].IsNumber) { throw new SerializationException(); }  SlowRate = _buf["slow_rate"]; }
+        { if(!_buf["dot_damage"].IsNumber) { throw new SerializationException(); }  DotDamage = _buf["dot_damage"]; }
+        { if(!_buf["is_obstacle"].IsBoolean) { throw new SerializationException(); }  IsObstacle = _buf["is_obstacle"]; }
+        { if(!_buf["is_conductor"].IsBoolean) { throw new SerializationException(); }  IsConductor = _buf["is_conductor"]; }
     }
 
     public static TileState DeserializeTileState(JSONNode _buf)
@@ -47,41 +43,25 @@ public sealed partial class TileState : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 持续秒数（-1=永久）
+    /// 存活秒数(-1=永久)
     /// </summary>
     public readonly float Duration;
     /// <summary>
-    /// 会继续参与反应（有温湿电属性）
+    /// 移速倍率(1=不减速)
     /// </summary>
-    public readonly bool CanReact;
+    public readonly float SlowRate;
     /// <summary>
-    /// 温度
+    /// 每秒伤害(0=无)
     /// </summary>
-    public readonly int Temp;
+    public readonly int DotDamage;
     /// <summary>
-    /// 湿度
+    /// 物理阻挡墙体
     /// </summary>
-    public readonly int Wet;
+    public readonly bool IsObstacle;
     /// <summary>
-    /// 导电性
+    /// 网格关联导通
     /// </summary>
-    public readonly int Cond;
-    /// <summary>
-    /// 标签(含土,含沙,含植物)
-    /// </summary>
-    public readonly dso.ElementTag Tags;
-    /// <summary>
-    /// 效果类型
-    /// </summary>
-    public readonly System.Collections.Generic.List<dso.TileEffectType> Effects;
-    /// <summary>
-    /// 效果数值编号
-    /// </summary>
-    public readonly System.Collections.Generic.List<int> EffectValuePos;
-    /// <summary>
-    /// 注释
-    /// </summary>
-    public readonly string Tip;
+    public readonly bool IsConductor;
    
     public const int __ID__ = 1483327413;
     public override int GetTypeId() => __ID__;
@@ -96,14 +76,10 @@ public sealed partial class TileState : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "duration:" + Duration + ","
-        + "canReact:" + CanReact + ","
-        + "temp:" + Temp + ","
-        + "wet:" + Wet + ","
-        + "cond:" + Cond + ","
-        + "tags:" + Tags + ","
-        + "effects:" + Luban.StringUtil.CollectionToString(Effects) + ","
-        + "effectValuePos:" + Luban.StringUtil.CollectionToString(EffectValuePos) + ","
-        + "tip:" + Tip + ","
+        + "slowRate:" + SlowRate + ","
+        + "dotDamage:" + DotDamage + ","
+        + "isObstacle:" + IsObstacle + ","
+        + "isConductor:" + IsConductor + ","
         + "}";
     }
 }

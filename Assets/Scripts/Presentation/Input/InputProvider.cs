@@ -6,11 +6,20 @@ using UnityEngine.InputSystem;
 namespace DeepseaOil.Presentation.Input
 {
     /// <summary>输入采样器：GameRoot 每渲染帧调一次，采样点唯一</summary>
+
     public sealed class InputProvider : MonoBehaviour
     {
         private InputSys _input;
 
         private GameRoot _root;
+
+        private InputAction _attack;
+
+        private InputAction _altAttack;
+
+        private InputAction _plant;
+
+        private InputAction _aim;
 
         private Vector2 _move;
 
@@ -27,12 +36,43 @@ namespace DeepseaOil.Presentation.Input
 
         public bool AltAttackPressedThisFrame { get; private set; }
 
+        /// <summary>E 键：播种当前战备种子</summary>
+        public bool PlantPressedThisFrame { get; private set; }
+
+        /// <summary>本渲染帧的移动输入（已夹到单位长度）；生命神泉的"完全静止"判据之一</summary>
+        public Vector2 MoveInput { get; private set; }
+
         // 输入开关；暂停/菜单时为 false
         public bool IsInputEnabled => _inputEnabled;
 
         private void Awake()
         {
             _input = new InputSys();
+
+            Bind();
+        }
+
+        /// <summary>按路径取动作；取不到当场报出来，不静默变成"按键没反应"</summary>
+        private void Bind()
+        {
+            _attack = Resolve("Player/Attack");
+            _altAttack = Resolve("Player/AltAttack");
+            _plant = Resolve("Player/Plant");
+            _aim = Resolve("Player/Aim");
+        }
+
+        private InputAction Resolve(string path)
+        {
+            InputAction action = _input.asset.FindAction(path, throwIfNotFound: false);
+
+            if (action == null)
+            {
+                Debug.LogError(
+                    $"[Input] InputSys.inputactions 里找不到动作 {path}：" +
+                    "该战斗输入将永久失效。请在动作表里补上它（并保存资产）。", this);
+            }
+
+            return action;
         }
 
         private void Start()
@@ -69,30 +109,38 @@ namespace DeepseaOil.Presentation.Input
                 1f
             );
 
+            MoveInput = _move;
+
             _grabHeld = _input.Player.Grab.IsPressed();
 
             // 瞬时输入累积，物理帧侧取走
             _dashPressed |= _input.Player.Dash.WasPressedThisFrame();
         }
 
-        // SamplePointer：瞄准位置 + 左右键按下沿。暂不走 InputSys.inputactions —— 动作表里没有这两个动作，改它要重新生成 95KB 的 InputSys.cs
-        // 迁移触发条件：需要"键位重绑"或"手柄投掷"时，把 Attack/AltAttack/Aim 加进 Player map 再重新生成
+        /// <remarks>禁用时按下沿必须清成 false：指针采样不受动作表开关影响，少了它"暂停时点一下鼠标"会当成开火。</remarks>
         private void SamplePointer()
         {
-            Mouse mouse = Mouse.current;
-
-            // 禁用时按下沿必须清成 false：指针采样不受动作表开关影响，少了它"暂停时点一下鼠标"会当成开火。
-            if (mouse == null || !_inputEnabled)
+            if (!_inputEnabled)
             {
                 AttackPressedThisFrame = false;
                 AltAttackPressedThisFrame = false;
+                PlantPressedThisFrame = false;
 
                 return;
             }
 
-            AimScreen = mouse.position.ReadValue();
-            AttackPressedThisFrame = mouse.leftButton.wasPressedThisFrame;
-            AltAttackPressedThisFrame = mouse.rightButton.wasPressedThisFrame;
+            if (_aim != null) AimScreen = _aim.ReadValue<Vector2>();
+
+            AttackPressedThisFrame = Pressed(_attack);
+
+            AltAttackPressedThisFrame = Pressed(_altAttack);
+
+            PlantPressedThisFrame = Pressed(_plant);
+        }
+
+        private static bool Pressed(InputAction action)
+        {
+            return action != null && action.WasPressedThisFrame();
         }
 
         /// <summary>取物理帧输入快照；消费后清除按下沿</summary>

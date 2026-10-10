@@ -23,10 +23,6 @@ public sealed partial class Projectile : Luban.BeanBase
         { if(!_buf["id"].IsNumber) { throw new SerializationException(); }  Id = (dso.BallType)_buf["id"].AsInt; }
         { if(!_buf["name"].IsString) { throw new SerializationException(); }  Name = _buf["name"]; }
         { if(!_buf["type"].IsNumber) { throw new SerializationException(); }  Type = (dso.ElementType)_buf["type"].AsInt; }
-        { if(!_buf["temp"].IsNumber) { throw new SerializationException(); }  Temp = _buf["temp"]; }
-        { if(!_buf["wet"].IsNumber) { throw new SerializationException(); }  Wet = _buf["wet"]; }
-        { if(!_buf["conductive"].IsNumber) { throw new SerializationException(); }  Conductive = _buf["conductive"]; }
-        { if(!_buf["tags"].IsNumber) { throw new SerializationException(); }  Tags = (dso.ElementTag)_buf["tags"].AsInt; }
     }
 
     public static Projectile DeserializeProjectile(JSONNode _buf)
@@ -46,22 +42,6 @@ public sealed partial class Projectile : Luban.BeanBase
     /// 类型
     /// </summary>
     public readonly dso.ElementType Type;
-    /// <summary>
-    /// 温度(-6~6)
-    /// </summary>
-    public readonly int Temp;
-    /// <summary>
-    /// 湿度(0~6)
-    /// </summary>
-    public readonly int Wet;
-    /// <summary>
-    /// 导电(0无,1中,2强)
-    /// </summary>
-    public readonly int Conductive;
-    /// <summary>
-    /// 标签(含土,含沙,含植物)
-    /// </summary>
-    public readonly dso.ElementTag Tags;
    
     public const int __ID__ = 2013538039;
     public override int GetTypeId() => __ID__;
@@ -76,10 +56,6 @@ public sealed partial class Projectile : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "type:" + Type + ","
-        + "temp:" + Temp + ","
-        + "wet:" + Wet + ","
-        + "conductive:" + Conductive + ","
-        + "tags:" + Tags + ","
         + "}";
     }
 }

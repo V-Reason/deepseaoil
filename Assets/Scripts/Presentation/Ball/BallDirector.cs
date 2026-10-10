@@ -9,14 +9,12 @@ using cfg.dso;
 namespace DeepseaOil.Presentation.Ball
 {
     /// <summary>球的调度器，由组合根显式造与驱动</summary>
-    /// <remarks>飞行与改格都在渲染帧，只有冲量跨物理帧</remarks>
-    public sealed class BallDirector : IBallLogicEffectContext
+    /// <remarks>飞行与改格都在渲染帧，只有冲量跨物理帧。落地只做一件事：把（落点格, 球种）交给格子层，反应与冲击全在那里闭环。</remarks>
+    public sealed class BallDirector
     {
         private readonly List<BallActor> _flying = new List<BallActor>();
 
         private readonly Dictionary<BallType, ProjectileSpec> _balls = new Dictionary<BallType, ProjectileSpec>();
-
-        private readonly Dictionary<BallType, IBallLogicEffect> _effects = new Dictionary<BallType, IBallLogicEffect>();
 
         private GridLogic _grid;
         private ImpulseExecutor _impulses;
@@ -38,7 +36,6 @@ namespace DeepseaOil.Presentation.Ball
             _ballRoot = ballRoot;
 
             _balls.Clear();
-            _effects.Clear();
 
             if (balls == null) return;
 
@@ -47,9 +44,6 @@ namespace DeepseaOil.Presentation.Ball
                 ProjectileSpec ball = balls[i];
 
                 _balls[ball.Type] = ball;
-
-                // 球种都走同一条落地链（元素反应）；旧 projectile.tile_state 列已作废，落地后世界由 element_rule 算
-                _effects[ball.Type] = new TileStateLogicEffect();
             }
         }
 
@@ -107,27 +101,13 @@ namespace DeepseaOil.Presentation.Ball
             _impulses?.Clear();
         }
 
-        public void RequestTileState(Vector3Int cell, in ElementValue element)
-        {
-            if (_grid == null) return;
-
-            _grid.OnBallHit(cell, in element);
-        }
-
         /// <summary>一次落地的完整结算，先改格再排冲量</summary>
-        /// <remarks>顺序即语义：改格在同一帧内结算目标伤害；冲量下一物理帧才生效</remarks>
+        /// <remarks>顺序即语义：改格在同一帧内结算落地冲击（含首跳伤害与连锁）；冲量下一物理帧才生效。</remarks>
         private void OnLanded(BallActor ball, Vector2 point)
         {
             if (_grid != null && _grid.Geometry.IsValid)
             {
-                Vector3Int cell = _grid.WorldToCell(point);
-
-                if (_effects.TryGetValue(ball.Type, out IBallLogicEffect effect) && effect != null)
-                {
-                    ProjectileSpec definition = ball.Definition;
-
-                    effect.Apply(cell, definition, this);
-                }
+                _grid.OnBallHit(_grid.WorldToCell(point), ball.Definition.Type);
             }
 
             _impulses?.Enqueue(point, ball.Definition.Tuning);

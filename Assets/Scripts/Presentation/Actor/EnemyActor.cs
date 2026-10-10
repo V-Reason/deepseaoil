@@ -11,9 +11,9 @@ using UnityEngine;
 namespace DeepseaOil.Presentation.Actor
 {
     /// 一只敌人的组合根：抓预制体上的执行器与视效、推进逻辑层、结算伤害与死亡
-    /// 身体、碰撞体半径、渲染件、死亡特效全由预制体决定（enemies/Enemy_{id}.prefab）：本类不 AddComponent、不建头顶数字，缺件只报错不兜底；受伤只有一条路 TakeDamage；脚底中心每帧登记进 EnemyCellRegistry，格子按"人站在哪一格"结算；不自己驱动，由 CombatDirector 逐只 FixedTick
+
     [DisallowMultipleComponent]
-    public sealed class EnemyActor : MonoBehaviour, IDamageable, ISlowable, IKnockBackable, IStunnable, IManagedActor
+    public sealed class EnemyActor : MonoBehaviour, IDamageable, ISlowable, IKnockBackable, IStunnable, IManagedActor, IContactDamager
     {
         [Header("死亡反馈")]
         [Tooltip("死亡时播放的特效；由预制体配置")]
@@ -45,6 +45,14 @@ namespace DeepseaOil.Presentation.Actor
 
         /// 本帧生效的减速乘数（视效读数），速度由门禁经账本落地；一份数据两个消费者
         private float _slowMultiplier = 1f;
+
+        /// <summary>贴身伤害，取自 enemy 表；ContactProbe 经 IContactDamager 读它</summary>
+        public int ContactDamage => _spec != null ? _spec.ContactDamage : 0;
+
+        /// <summary>死亡回调，只触发一次；战利品与读数刷新由 CombatDirector 接</summary>
+        public System.Action<EnemyActor> Died;
+
+        private bool _deathFired;
 
         /// 麻痹到期时刻（Time.time 口径），0=没被麻痹过；只记不改移动
         private float _stunnedUntil;
@@ -323,6 +331,14 @@ namespace DeepseaOil.Presentation.Actor
             {
                 _registry.Unregister(this);
                 _registered = false;
+            }
+
+            // 先发事实再销毁：回调方要用位置与取值边界（战利品落在死亡那一刻的地方）
+            if (!_deathFired)
+            {
+                _deathFired = true;
+
+                Died?.Invoke(this);
             }
 
             EffectContext ctx = EffectContext.At(Position, hitDirection);

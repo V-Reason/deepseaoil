@@ -12,22 +12,20 @@ namespace DeepseaOil.Logic.Events
 
     public readonly struct RequestResume { }
 
-    public readonly struct RequestChangeScene 
+    public readonly struct RequestChangeScene
     {
         public readonly string sceneName;
         public RequestChangeScene(string n) { sceneName = n; }
     }
 
-    // 请求 HUD 重新播报一次当前值。面板异步加载至少晚一帧，而事实事件只在值变化时发布，加载完成时看到空值；
-    // 面板先订阅再发本条意图，持有数据的系统收到后重播。
+    // 请求 HUD 重新播报一次当前值：面板异步加载晚一帧，而事实事件只在变化时发布
     public readonly struct RequestHudRefresh { }
-
 
     public readonly struct GamePaused { }
 
     public readonly struct GameResumed { }
 
-    // 某一格状态变了，表现层据此换 Tilemap 贴图，也是"格子状态"唯一的对外出口。
+    // 某一格状态变了，表现层据此换贴图
     public readonly struct TileStateChanged
     {
         public readonly Vector3Int Cell;
@@ -41,8 +39,7 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    // 瞄准变了的事实，发布方去重。Available 是玩家侧口径：射程内 ＋ 冷却就绪 ＋ 有水球；
-    // 世界侧接不接受由裁决回执决定，不进本事件。
+    // 瞄准变了的事实，发布方去重；世界侧接不接受由裁决回执决定，不进本事件
     public readonly struct AimChanged
     {
         public readonly bool HasAim;
@@ -59,7 +56,7 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    // 掉落物被领取了的事实，数量在载荷里不在订阅方。
+    // 掉落物被领取了的事实，数量在载荷里不在订阅方
     public readonly struct DropCollected
     {
         public readonly DropType Type;
@@ -73,13 +70,26 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    public readonly struct WaterBallCountChanged
+    /// <summary>玩家二元弹药与战备种子变了</summary>
+    public readonly struct PlayerAmmoChanged
     {
-        public readonly int Count;
+        public readonly int Water;
 
-        public WaterBallCountChanged(int count)
+        public readonly int WaterCapacity;
+
+        public readonly int Earth;
+
+        public readonly int EarthCapacity;
+
+        public readonly SeedType Seed;
+
+        public PlayerAmmoChanged(int water, int waterCapacity, int earth, int earthCapacity, SeedType seed)
         {
-            Count = count;
+            Water = water;
+            WaterCapacity = waterCapacity;
+            Earth = earth;
+            EarthCapacity = earthCapacity;
+            Seed = seed;
         }
     }
 
@@ -96,7 +106,7 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    // 波次或存活数变了；WaveIndex 从 1 起。
+    // 波次或存活数变了；WaveIndex 从 1 起
     public readonly struct WaveChanged
     {
         public readonly int WaveIndex;
@@ -107,6 +117,31 @@ namespace DeepseaOil.Logic.Events
         {
             WaveIndex = waveIndex;
             Alive = alive;
+        }
+    }
+
+    /// <summary>波次进入新阶段；备战期带配给种子与倒计时</summary>
+    public readonly struct WavePhaseChanged
+    {
+        public readonly int WaveIndex;
+
+        public readonly DeepseaOil.Logic.Wave.WavePhase Phase;
+
+        public readonly SeedType GrantSeed;
+
+        /// <summary>本阶段剩余秒数</summary>
+        public readonly float SecondsLeft;
+
+        public WavePhaseChanged(
+            int waveIndex,
+            DeepseaOil.Logic.Wave.WavePhase phase,
+            SeedType grantSeed,
+            float secondsLeft)
+        {
+            WaveIndex = waveIndex;
+            Phase = phase;
+            GrantSeed = grantSeed;
+            SecondsLeft = secondsLeft;
         }
     }
 }

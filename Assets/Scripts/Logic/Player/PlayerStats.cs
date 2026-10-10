@@ -1,11 +1,13 @@
+using DeepseaOil.Data;
 using DeepseaOil.Logic.Combat;
 using DeepseaOil.Logic.Events;
-using DeepseaOil.Data;
 using UnityEngine;
+using cfg.dso;
 
 namespace DeepseaOil.Logic.Player
 {
-    /// <summary>玩家账本：血量+无敌帧+水球计数</summary>
+    // <summary>玩</summary>
+    // <remarks>种</remarks>
     public sealed class PlayerStats : IAlivable
     {
         private readonly PlayerSpec _spec;
@@ -18,21 +20,34 @@ namespace DeepseaOil.Logic.Player
         {
             _spec = spec;
             _current = spec.MaxHp;
+            Water = Clamp(spec.WaterStart, spec.WaterCapacity);
+            Earth = Clamp(spec.EarthStart, spec.EarthCapacity);
+            Seed = SeedType.None;
         }
 
         public PlayerSpec Spec => _spec;
 
-        public int WaterBallCount { get; private set; }
+        public int Water { get; private set; }
+
+        public int Earth { get; private set; }
+
+        // <summary>当</summary>
+        public SeedType Seed { get; private set; }
+
+        public int WaterCapacity => _spec.WaterCapacity;
+
+        public int EarthCapacity => _spec.EarthCapacity;
 
         public bool IsAlive => _current > 0f;
 
-        /// <remarks>必须写成 !(now &lt; invulnerableUntil)：否则 NaN 时永久无敌且看不出来</remarks>
+        public float Current => _current;
+
+        // <remarks>必</remarks>
         public static bool CanTakeDamage(float now, float invulnerableUntil)
         {
             return !(now < invulnerableUntil);
         }
 
-        /// <remarks>被无敌帧挡掉时不扣血也不写无敌；接触伤害贴住会重复结算，靠无敌帧挡</remarks>
         public bool ApplyDamage(float amount, float now)
         {
             if (amount <= 0f) return false;
@@ -48,6 +63,20 @@ namespace DeepseaOil.Logic.Player
             return true;
         }
 
+        // <summary>回</summary>
+        public bool TryHeal(float amount = 1f)
+        {
+            if (amount <= 0f) return false;
+
+            if (_current >= _spec.MaxHp) return false;
+
+            _current = Mathf.Min(_spec.MaxHp, _current + amount);
+
+            EventBus<PlayerHealthChanged>.Publish(new PlayerHealthChanged(_current, _spec.MaxHp));
+
+            return true;
+        }
+
         public void ResetToFull()
         {
             _current = _spec.MaxHp;
@@ -56,35 +85,90 @@ namespace DeepseaOil.Logic.Player
             EventBus<PlayerHealthChanged>.Publish(new PlayerHealthChanged(_current, _spec.MaxHp));
         }
 
-        /// <summary>加水球，非正数 no-op</summary>
-        public void AddWaterBall(int amount = 1)
+        public int AmountOf(ResourceKind kind)
         {
-            if (amount <= 0) return;
-
-            WaterBallCount += amount;
-
-            EventBus<WaterBallCountChanged>.Publish(new WaterBallCountChanged(WaterBallCount));
+            return kind == ResourceKind.Water ? Water : Earth;
         }
 
-        /// <summary>消耗水球，不够时不改状态</summary>
-        public bool TryConsumeWater(int amount = 1)
+        public int CapacityOf(ResourceKind kind)
+        {
+            return kind == ResourceKind.Water ? WaterCapacity : EarthCapacity;
+        }
+
+        // <summary>消</summary>
+        public bool TryConsume(ResourceKind kind, int amount = 1)
         {
             if (amount <= 0) return false;
 
-            if (WaterBallCount < amount) return false;
+            if (AmountOf(kind) < amount) return false;
 
-            WaterBallCount -= amount;
+            if (kind == ResourceKind.Water) Water -= amount;
+            else Earth -= amount;
 
-            EventBus<WaterBallCountChanged>.Publish(new WaterBallCountChanged(WaterBallCount));
+            PublishAmmo();
+
+            return true;
+        }
+
+        // <summary>补</summary>
+        public bool Refill(ResourceKind kind)
+        {
+            int capacity = CapacityOf(kind);
+
+            if (AmountOf(kind) >= capacity) return false;
+
+            if (kind == ResourceKind.Water) Water = capacity;
+            else Earth = capacity;
+
+            PublishAmmo();
+
+            return true;
+        }
+
+        // <summary>发</summary>
+        public bool GrantSeed(SeedType seed)
+        {
+            if (seed == SeedType.None) return false;
+
+            Seed = seed;
+
+            PublishAmmo();
+
+            return true;
+        }
+
+        // <summary>消</summary>
+        public bool TryConsumeSeed()
+        {
+            if (Seed == SeedType.None) return false;
+
+            Seed = SeedType.None;
+
+            PublishAmmo();
 
             return true;
         }
 
         public void Announce()
         {
-            EventBus<WaterBallCountChanged>.Publish(new WaterBallCountChanged(WaterBallCount));
-
             EventBus<PlayerHealthChanged>.Publish(new PlayerHealthChanged(_current, _spec.MaxHp));
+
+            PublishAmmo();
+        }
+
+        private void PublishAmmo()
+        {
+            EventBus<PlayerAmmoChanged>.Publish(
+                new PlayerAmmoChanged(Water, WaterCapacity, Earth, EarthCapacity, Seed));
+        }
+
+        private static int Clamp(int value, int capacity)
+        {
+            if (capacity < 0) capacity = 0;
+
+            if (value < 0) return 0;
+
+            return value > capacity ? capacity : value;
         }
     }
 }

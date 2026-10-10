@@ -1,99 +1,105 @@
 using System.Collections.Generic;
+using DeepseaOil.Data;
 using UnityEngine;
 using cfg.dso;
-using DeepseaOil.Data;
 
 namespace DeepseaOil.Logic.Element
 {
-    /// <remarks>未命中恒为 false/None/null/-1，不兜底</remarks>
-    public readonly struct ReactionMatch
-    {
-        public readonly bool Matched;
-
-        public readonly TileStateType Result;
-
-        public readonly IReadOnlyList<TileEffectValue> Effects;
-
-        public readonly int RuleIndex;
-
-        public readonly int Priority;
-
-        public ReactionMatch(
-            bool matched,
-            TileStateType result,
-            IReadOnlyList<TileEffectValue> effects,
-            int ruleIndex,
-            int priority)
-        {
-            Matched = matched;
-            Result = result;
-            Effects = effects;
-            RuleIndex = ruleIndex;
-            Priority = priority;
-        }
-
-        public int EffectCount => Effects?.Count ?? 0;
-
-        public static ReactionMatch None => new ReactionMatch(false, TileStateType.None, null, -1, 0);
-    }
-
-    /// <remarks>值类型零分配；原格元素是合成前的旧值</remarks>
-    public readonly struct ReactionTrace
-    {
-        public readonly ElementValue OldTile;
-
-        public readonly ElementValue Ball;
-
-        public readonly ElementValue Combined;
-
-        public readonly ReactionMatch Match;
-
-        public ReactionTrace(in ElementValue oldTile, in ElementValue ball, in ElementValue combined, in ReactionMatch match)
-        {
-            OldTile = oldTile;
-            Ball = ball;
-            Combined = combined;
-            Match = match;
-        }
-
-        public string Describe()
-        {
-            string verdict = Match.Matched
-                ? $"命中规则 #{Match.Priority} [生成地块: {Match.Result}({(int)Match.Result}), 效果数: {Match.EffectCount}]"
-                : "无规则命中";
-
-            return $"[Reaction] 原格元素 (T:{OldTile.Temperature}, W:{OldTile.Wet}, C:{OldTile.Conductivity}, Tags:{OldTile.Tags}) " +
-                   $"+ 球元素 (T:{Ball.Temperature}, W:{Ball.Wet}, C:{Ball.Conductivity}, Tags:{Ball.Tags}) " +
-                   $"= 合成元素 (T:{Combined.Temperature}, W:{Combined.Wet}, C:{Combined.Conductivity}) -> {verdict}";
-        }
-    }
-
-    /// <summary>在一份元素上找第一条命中的规则，纯函数</summary>
-    /// <remarks>顺序即优先级，清单顺序就是判定顺序（ConfigModule.GetElementRules() 保证）；无命中返回 None，调用方不做事；关闭时零分配</remarks>
+    // <summary>离散二元反应求解器：(原格地貌</summary>
+    // <remarks>纯函数：不读不写世界状态</remarks>
     public static class ReactionResolver
     {
-        /// <summary>追踪开关：置 true 每次落地输出一行 [Reaction]，正式构建保持 false</summary>
+        private static Dictionary<(TileStateType, BallType), ElementRuleSpec> _rules;
+
+        // <summary>追踪开关：置 true 时每次落地</summary>
         public static bool TraceEnabled;
 
-        public static ReactionMatch Match(IReadOnlyList<ElementRuleSpec> rules, in ElementValue element)
+        public static int RuleCount => _rules?.Count ?? 0;
+
+        // <summary>装配期初始化；</summary>
+        // <remarks>(SourceTile</remarks>
+        public static void Initialize(IReadOnlyList<ElementRuleSpec> rules)
         {
-            if (rules == null || rules.Count == 0) return ReactionMatch.None;
+            Clear();
+
+            if (rules == null || rules.Count == 0) return;
+
+            _rules = new Dictionary<(TileStateType, BallType), ElementRuleSpec>(rules.Count);
 
             for (int i = 0; i < rules.Count; i++)
             {
-                if (!rules[i].Match(in element)) continue;
+                ElementRuleSpec rule = rules[i];
 
-                return new ReactionMatch(true, rules[i].ResultTileType, rules[i].Effects, i, rules[i].Priority);
+                var key = (rule.SourceTile, rule.BallType);
+
+                if (_rules.ContainsKey(key))
+                {
+                    Debug.LogError(
+                        $"[Reaction] element_rule 里 ({rule.SourceTile}, {rule.BallType}) 出现了两次（id={rule.Id}）：" +
+                        "后者会被忽略，请检查源表。");
+
+                    continue;
+                }
+
+                _rules[key] = rule;
             }
-
-            return ReactionMatch.None;
         }
 
-        public static void LogTrace(in ReactionTrace trace)
+        public static void Clear()
+        {
+            _rules = null;
+        }
+
+        /// <summary>裁决一次落地</summary>
+        // <remarks>未命中任何规则时：</remarks>
+        public static ReactionOutcome Resolve(TileStateType currentTile, BallType ball)
+        {
+            if (_rules != null && _rules.TryGetValue((currentTile, ball), out ElementRuleSpec rule))
+            {
+                var outcome = new ReactionOutcome(
+                    rule.ResultTile,
+                    rule.ImpactDamage,
+                    rule.ImpactKnockback,
+                    rule.ImpactStun,
+                    rule.TriggerChain);
+
+                LogTrace(currentTile, ball, rule);
+
+                return outcome;
+            }
+
+            ReactionOutcome fallback = Fallback(currentTile, ball);
+
+            LogTrace(currentTile, ball, null);
+
+            return fallback;
+        }
+
+        // <summary>表未命中时的兜底：</summary>
+        private static ReactionOutcome Fallback(TileStateType currentTile, BallType ball)
+        {
+            if (currentTile != TileStateType.Normal) return ReactionOutcome.Unchanged(currentTile);
+
+            switch (ball)
+            {
+                case BallType.Water:
+                    return new ReactionOutcome(TileStateType.BasicWater, 0, 0f, 0f, false);
+
+                case BallType.Earth:
+                    return new ReactionOutcome(TileStateType.BasicEarth, 0, 0f, 0f, false);
+
+                default:
+                    return ReactionOutcome.Unchanged(currentTile);
+            }
+        }
+
+        private static void LogTrace(TileStateType currentTile, BallType ball, ElementRuleSpec rule)
         {
             if (!TraceEnabled) return;
 
-            Debug.Log(trace.Describe());
+            Debug.Log(rule != null
+                ? $"[Reaction] {currentTile} + {ball} → {rule.ResultTile}（规则 #{rule.Id}，伤害 {rule.ImpactDamage}，击退 {rule.ImpactKnockback}，麻痹 {rule.ImpactStun}，连锁 {rule.TriggerChain}）"
+                : $"[Reaction] {currentTile} + {ball} → 无规则命中（走兜底）");
         }
     }
 }

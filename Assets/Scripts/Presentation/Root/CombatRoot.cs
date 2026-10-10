@@ -1,16 +1,20 @@
 using System.Collections.Generic;
 using DeepseaOil.Data;
 using DeepseaOil.Logic.Combat;
+using DeepseaOil.Logic.Drop;
 using DeepseaOil.Logic.Element;
 using DeepseaOil.Logic.Events;
 using DeepseaOil.Logic.Grid;
 using DeepseaOil.Logic.Grid.States;
 using DeepseaOil.Logic.Player;
+using DeepseaOil.Logic.World;
 using DeepseaOil.Presentation.Actor;
 using DeepseaOil.Presentation.Adapters;
 using DeepseaOil.Presentation.Ball;
 using DeepseaOil.Presentation.Drop;
+using DeepseaOil.Presentation.Effects;
 using DeepseaOil.Presentation.Grid;
+using DeepseaOil.Presentation.Input;
 using DeepseaOil.Presentation.Visual;
 using DeepseaOil.Presentation.World;
 using UnityEngine;
@@ -19,7 +23,7 @@ using cfg.dso;
 namespace DeepseaOil.Presentation
 {
     /// 战斗切片的组合根：装配一次，每帧驱动
-    /// 无 Update/FixedUpdate，GameRoot 调 RenderTick 与 FixedTick：渲染帧=格子→球→落物→喷泉，物理帧=冲量→敌人→玩家受击
+    // 无 Update/FixedUpdate，
     public sealed class CombatRoot : MonoBehaviour, ISceneRoot, IRenderTicked, IPhysicsTicked, IThrowSink
     {
         /// 世界侧排在玩家侧之后
@@ -39,7 +43,7 @@ namespace DeepseaOil.Presentation
         [Tooltip("敌人的父物体。留空则建在场景根下。")]
         [SerializeField] private Transform actorRoot = default;
 
-        [Tooltip("场景里的喷泉。每帧由本类驱动（水球不是自驱的）。留空则资源系统不生效。")]
+        [Tooltip("场景里的泉眼。每帧由本类驱动（落物不是自驱的）。留空则只靠掉落物补给。")]
         [SerializeField] private Fountain[] fountains = new Fountain[0];
 
         [Tooltip("是否刷敌人。关掉可以只验投掷链路。")]
@@ -47,10 +51,7 @@ namespace DeepseaOil.Presentation
 
         private GameRoot _root;
 
-        private GridLogic _grid;
-        private EnemyCellRegistry _registry;
-
-        private TileElementReactor _element;
+        private GridLogic _grid;        private EnemyCellRegistry _registry;
 
         private BallDirector _balls;
 
@@ -60,6 +61,11 @@ namespace DeepseaOil.Presentation
 
         private CombatDirector _combat;
         private TileHighlightView _highlight;
+
+        // <summary>生命神泉的静止累计；</summary>
+        private LifeFountainState _lifeFountain;
+
+        private Fountain _lifeFountainSource;
 
         private readonly List<Vector3Int> _contactCells = new List<Vector3Int>(9);
 
@@ -87,7 +93,7 @@ namespace DeepseaOil.Presentation
             _highlight?.Detach();
             gridView?.Detach();
 
-            // 销毁期再问 GameRoot.Instance 会当场造一个新的，用 Start 里抓的引用
+            // 销毁期再问 GameRoot.Instance 会当
             if (_root != null) _root.UnregisterSceneRoot(this);
         }
 
@@ -107,7 +113,7 @@ namespace DeepseaOil.Presentation
         {
             if (!IsReady) return;
 
-            // 顺序：格子先跑（泥浆可能本帧到期），再推球（落地改格加冲量）与落物，最后喷泉
+            // 顺序：格子先跑（泥浆可能本帧到期），
             _grid.Tick(Time.time, deltaTime);
 
             _balls.Tick(deltaTime);
@@ -120,6 +126,10 @@ namespace DeepseaOil.Presentation
 
                 if (fountain != null) fountain.Tick(deltaTime);
             }
+
+            TickLifeFountain(deltaTime);
+
+            TickPlanting();
         }
 
         public void FixedTick(float deltaTime)
@@ -131,15 +141,75 @@ namespace DeepseaOil.Presentation
             // ① 落地冲量：必须在物理帧施加，渲染帧施加会漂
             _impulses.FixedTick();
 
-            // ② 敌人先按本帧位置追一步，再让格子按新位置结算（顺序固定=可复现）
+            // ② 敌人先按本帧位置追一步，再让格子按新位置结算（顺
             if (_combat != null) _combat.FixedTick(now, deltaTime);
 
             // ③ 玩家受击：读物理体位置，须在敌人移动之后
             UpdatePlayerContact(now);
         }
 
-        /// 世界侧两件玩家相关裁决：谁打到玩家、打空怎么重来
-        /// 判定是纯函数（ContactProbe.TryFindAttacker），可在 EditMode 测。世界→玩家只走通知：组装 Damage 经 PlayerLogic.TakeDamage，扣血/无敌/推多远由玩家侧定
+        // <summary>播种：E 键把战备种子落成环境发生</summary>
+        // <remarks>合法性判据在 Logic 层（S</remarks>
+        private void TickPlanting()
+        {
+            InputProvider input = player != null ? player.Input : null;
+
+            if (input == null || !input.PlantPressedThisFrame) return;
+
+            PlayerLogic logic = player.Logic;
+
+            if (logic == null || !logic.Combat.HasAim) return;
+
+            Vector3Int cell = logic.Combat.AimCell;
+
+            if (!SeedPlanter.CanPlant(_grid, cell, logic.Stats.Seed)) return;
+
+            SeedSpec seed = ConfigModule.GetSeed(logic.Stats.Seed);
+
+            if (seed == null) return;
+
+            if (!logic.Stats.TryConsumeSeed()) return;
+
+            _grid.SwitchTileState(cell, seed.SpawnTile);
+
+            EffectContext ctx = EffectContext.At(_grid.Geometry.CellCenter(cell));
+
+            ctx.Radius = _grid.Geometry.CellSize * 0.5f;
+
+            EffectModule.Play(EffectId.Highlight, in ctx);
+        }
+
+        // <summary>生命神泉：九宫格内完全静止达阈值回</summary>
+        // <remarks>三重静止判据（无输入＋速度近零＋位</remarks>
+        private void TickLifeFountain(float deltaTime)
+        {
+            if (_lifeFountain == null || _lifeFountainSource == null) return;
+
+            PlayerLogic logic = player != null ? player.Logic : null;
+
+            if (logic == null) return;
+
+            InputProvider input = player.Input;
+
+            Vector2 position = player.Position;
+
+            bool hasMoveInput = input != null && input.MoveInput.sqrMagnitude > 0.0001f;
+
+            bool healed = _lifeFountain.Tick(
+                position,
+                _lifeFountainSource.PlayerInside,
+                hasMoveInput,
+                player.EngineVelocity.magnitude,
+                deltaTime);
+
+            if (!healed) return;
+
+            // 满血时 TryHeal 返回 false，
+            logic.Stats.TryHeal();
+        }
+
+        // <summary>世界侧两件玩家相关裁决：</summary>
+        // <remarks>判定是纯函数（ContactPro</remarks>
         private void UpdatePlayerContact(float now)
         {
             PlayerLogic logic = player != null ? player.Logic : null;
@@ -170,6 +240,8 @@ namespace DeepseaOil.Presentation
                     _registry,
                     _contactCells,
                     out Vector2 attacker,
+                    out float _,
+                    out int contactDamage,
                     out _))
             {
                 return;
@@ -179,7 +251,7 @@ namespace DeepseaOil.Presentation
             Damage damage = Damage.At(
                 attacker,
                 position,
-                spec.ContactDamage,
+                contactDamage,
                 DamageSource.Contact,
                 spec.KnockbackImpulse);
 
@@ -203,10 +275,12 @@ namespace DeepseaOil.Presentation
 
             // 掉落物同理：上一局没捡完的水球不该留到下一局
             _drops?.ClearAll();
+
+            TileChainReactor.Clear();
         }
 
-        /// 裁决投掷请求（IThrowSink）：落点合法性属世界信息
-        /// 唯一否决判据：落点格没有地板（GridLogic.HasCell）；将来的阻挡/占位物加在这里，玩家侧不用改
+        // <summary>裁决投掷请求（IThrowSin</summary>
+        // <remarks>唯一否决判据：</remarks>
         public bool RequestThrow(in ThrowIntent intent)
         {
             if (!IsReady) return false;
@@ -216,7 +290,7 @@ namespace DeepseaOil.Presentation
             return _balls != null && _balls.Throw(in intent);
         }
 
-        /// 组装战斗切片：依赖全来自参数与 Data 层（无 FindObjectOfType 与 Inspector 数值），射程取 PlayerSpec.MaxThrowDistance
+        // <summary>组装战斗切片：</summary>
         private void Assemble()
         {
             if (player == null || gridView == null)
@@ -246,22 +320,24 @@ namespace DeepseaOil.Presentation
 
             IReadOnlyList<ProjectileSpec> balls = ConfigModule.GetAllBalls();
 
-            // 元素层的表数据：反应规则（顺序即优先级）+ 地块效果（DoT 数值与节奏来源）
+            // 元素层两张表：球砸地面的规则网，以及地面与地面的二级反应
             IReadOnlyList<ElementRuleSpec> elementRules = ConfigModule.GetElementRules();
-            IReadOnlyList<TileEffectSpec> tileEffects = ConfigModule.GetTileEffects();
+
+            DuoReactionCatalog duo = ConfigModule.GetDuoReactions();
+
+            ReactionResolver.Initialize(elementRules);
+
+            TileChainReactor.Clear();
 
             _registry = new EnemyCellRegistry();
 
             GridGeometry geometry = gridView.ReadGeometry();
 
-            // 元素层由组合根装配：GridLogic 只收端口，不认识规则表与 ConfigModule
-            _element = new TileElementReactor(elementRules);
-
             _grid = new GridLogic(
                 geometry,
                 ConfigModule.GetAllTileStates(),
                 CreateTileState,
-                _element,
+                duo,
                 _registry);
 
             // 先订阅格子状态变化再灌初始状态，否则那批泥浆不会被画出来
@@ -269,7 +345,7 @@ namespace DeepseaOil.Presentation
 
             int cells = gridView.RegisterCells(_grid);
 
-            // 关卡初始地块优先从场景里的 InitialSetup 笔刷层读（策划在编辑器里画）；没画才退回表驱动
+            // 关卡初始地块优先从场景里的 InitialSetup
             int initialStates = gridView.LoadInitialSetupTiles(_grid);
 
             if (initialStates == 0)
@@ -288,10 +364,7 @@ namespace DeepseaOil.Presentation
             _drops = new DropDirector();
             _drops.Attach(actorRoot, player.transform);
 
-            for (int i = 0; i < fountains.Length; i++)
-            {
-                if (fountains[i] != null) fountains[i].Attach(_drops);
-            }
+            AttachFountains();
 
             player.Logic.ConfigureAim(in geometry, playerSpec.MaxThrowDistance, this);
 
@@ -304,15 +377,43 @@ namespace DeepseaOil.Presentation
 
             Debug.Log(
                 $"[Combat] 装配完成：格子 {cells} 个（初始状态 {initialStates} 个），" +
-                $"球种 {balls.Count} 个，喷泉 {fountains.Length} 个，" +
-                $"反应规则 {elementRules.Count} 条，地块效果 {tileEffects.Count} 个，" +
-                (enableWaves
-                    ? "敌人 启用"
-                    : "敌人 关闭（CombatRoot 的「是否刷敌人」未勾选：想要刷怪请在 Inspector 上勾上它）"));
+                $"球种 {balls.Count} 个，泉眼 {fountains.Length} 个（生命神泉 {(_lifeFountain != null ? 1 : 0)} 个），" +
+                $"反应规则 {elementRules.Count} 条，二级反应 {duo.Count} 条，" +
+                (_lifeFountain != null
+                    ? $"回血静止 {_lifeFountain.HealInterval} 秒，"
+                    : "（未接线生命神泉：本局没有回血站，请在场景里放一个 kind=Life 的 Fountain）") +
+                (enableWaves ? "敌人 启用" : "敌人 关闭（「是否刷敌人」未勾选）"));
         }
 
-        /// 状态工厂：给 ID 造新实例，null=该 ID 没有实现
-        /// 不共享原型：状态自己记持续时长，否则全场共用一个计时器；所有状态共用表驱动实现 TableTileState，只读 TileStateSpec，规则表命中的状态与有实现的状态同一集合，配置里没有那一行才返回 null
+        // <summary>泉眼接线：弹药泉挂落物产出</summary>
+        private void AttachFountains()
+        {
+            for (int i = 0; i < fountains.Length; i++)
+            {
+                Fountain fountain = fountains[i];
+
+                if (fountain == null) continue;
+
+                fountain.Attach(_drops);
+
+                if (fountain.Kind != FountainKind.Life) continue;
+
+                if (_lifeFountain != null)
+                {
+                    Debug.LogWarning(
+                        "[Combat] 场景里有多个 kind=Life 的泉眼：只认第一个，其余不会回血。", fountain);
+
+                    continue;
+                }
+
+                _lifeFountainSource = fountain;
+
+                _lifeFountain = new LifeFountainState(player.Logic.Stats.Spec.LifeHealInterval);
+            }
+        }
+
+        // <summary>状态工厂：给 ID 造新实例</summary>
+        // <remarks>不共享原型：状态自己记持续时长</remarks>
         private static ITileState CreateTileState(TileStateType id)
         {
             TileStateSpec spec = ConfigModule.TryGetTileState(id);
@@ -345,23 +446,52 @@ namespace DeepseaOil.Presentation
 
             director.Initialize(
                 player,
-                ConfigModule.GetWave(),
+                ConfigModule.GetWaves(),
                 ConfigModule.GetEnemy(),
                 _grid,
                 _registry,
-                actorRoot);
+                actorRoot,
+                OnEnemyKilled);
 
             return director;
         }
 
-        /// 掉落物被领取：世界→玩家通知，按种类裁决给什么
-        /// 裁决在这里而不在掉落物里（掉落物只发事实）；加一种掉落物在这里加 case，玩家侧不用改
+        // <summary>精英怪战利品：</summary>
+        // <remarks>掉落方式走既有 IDropSpaw</remarks>
+        private void OnEnemyKilled(EnemySpec spec, Vector2 position)
+        {
+            if (spec == null || spec.Id != EliteEnemyId) return;
+
+            if (_drops == null) return;
+
+            _drops.TrySpawn(new DropSpawnRequest(DropType.Seed, position, position));
+
+            Debug.Log("[Combat] 精英怪被击杀，掉落了 1 颗战备种子。");
+        }
+
+        // <summary>精英怪在 enemy 表里的 id</summary>
+        private const int EliteEnemyId = 2;
+
+        // <summary>掉落物被领取：世界→玩家通知</summary>
+        // <remarks>裁决在这里而不在掉落物里（掉落物只</remarks>
         private void OnDropCollected(DropCollected evt)
         {
+            PlayerStats stats = player?.Logic?.Stats;
+
+            if (stats == null) return;
+
             switch (evt.Type)
             {
                 case DropType.Water:
-                    player?.Logic?.Stats.AddWaterBall(evt.Amount);
+                    stats.Refill(ResourceKind.Water);
+                    return;
+
+                case DropType.Earth:
+                    stats.Refill(ResourceKind.Earth);
+                    return;
+
+                case DropType.Seed:
+                    stats.GrantSeed(ConfigModule.GetWave().GrantSeed);
                     return;
 
                 default:
@@ -371,7 +501,7 @@ namespace DeepseaOil.Presentation
             }
         }
 
-        /// HUD 加载完成时重播：三块读数各播一次当前值
+        // <summary>HUD 加载完成时重播：</summary>
         private void OnRequestHudRefresh(RequestHudRefresh evt)
         {
             player?.Logic?.Stats.Announce();

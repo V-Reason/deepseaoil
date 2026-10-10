@@ -13,7 +13,7 @@ using cfg.dso;
 namespace DeepseaOil.Presentation.Diagnostics
 {
     /// <summary>地块反应独立驱动器：用鼠标把球元素砸到格子顶端，专验元素反应链与地块效果链</summary>
-    /// <remarks>自愈装配配置 / 资源 / GameRoot / 格子系统，缺哪补哪：可单独进 Play，也可与 CombatRoot 同场（复用其格子系统，不重复登记与 Tick）；驱动经 ISceneRoot 交 GameRoot（全工程唯一驱动入口）；落地事实由 Logic 层 [Reaction] 追踪输出（ReactionResolver.TraceEnabled），本类只管点选与读数。</remarks>
+
     public sealed class GridReactionHarness : MonoBehaviour, ISceneRoot, IRenderTicked
     {
         /// 世界侧与 CombatRoot 同序：自己 Tick 格子时排在玩家之后
@@ -38,7 +38,6 @@ namespace DeepseaOil.Presentation.Diagnostics
         private bool _attachedAdapter;
 
         private GridLogic _grid;
-        private TileElementReactor _element;
         private EnemyCellRegistry _registry;
 
         private GameRoot _root;
@@ -138,19 +137,21 @@ namespace DeepseaOil.Presentation.Diagnostics
             Debug.Log($"[Harness] 地块反应切片就绪：合法格 {_grid.CellCount} 个，球种 {_balls?.Count ?? 0} 个。");
         }
 
-        /// 本地最小运行时：元素层（反应规则）＋ 格子层（状态与效果），并登记地板格
+        /// 本地最小运行时：反应规则索引 ＋ 格子层（状态与冲击），并登记地板格
         private void BuildLocalGrid()
         {
             _registry = new EnemyCellRegistry();
 
-            // 元素层由组合根装配：GridLogic 只收端口，不认识规则表
-            _element = new TileElementReactor(ConfigModule.GetElementRules());
+            // 反应规则索引由组合根装配一次：GridLogic 只收表与查询表，不认识 ConfigModule
+            ReactionResolver.Initialize(ConfigModule.GetElementRules());
+
+            TileChainReactor.Clear();
 
             _grid = new GridLogic(
                 adapter.ReadGeometry(),
                 ConfigModule.GetAllTileStates(),
                 CreateTileState,
-                _element,
+                ConfigModule.GetDuoReactions(),
                 _registry);
 
             // 先订阅"状态变了"再登记：否则开局那一批初始状态不会被画出来
@@ -171,7 +172,7 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             Debug.Log(
                 $"[Harness] 本地装配最小运行时：登记地板 {cells} 格，初始状态 {initialStates} 个，" +
-                $"反应规则 {ConfigModule.GetElementRules().Count} 条。");
+                $"反应规则 {ReactionResolver.RuleCount} 条。");
         }
 
         /// 状态工厂：给 ID 造新实例，null=该 ID 没有实现（与 CombatRoot 同一套表驱动）
@@ -269,13 +270,15 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             TileStateType before = _grid.StateOf(cell);
 
-            bool changed = _grid.OnBallHit(cell, ball.Element);
+            ReactionOutcome outcome = ReactionResolver.Resolve(before, ball.Type);
+
+            bool changed = _grid.OnBallHit(cell, ball.Type);
 
             TileStateType after = _grid.StateOf(cell);
 
-            _lastFact = $"格 {cell}：{ball.Name} → {Label(before)} ⇒ {Label(after)}（{(changed ? "已转换" : "未转换")}）";
+            _lastFact = $"格 {cell}：{ball.Name} 裁决为 {Label(outcome.NextTile)}（伤害 {outcome.InstantDamage}／击退 {outcome.KnockbackCells}／麻痹 {outcome.StunSeconds}／连锁 {outcome.TriggerChain}）⇒ 实际 {Label(before)} → {Label(after)}（{(changed ? "已生效" : "无变化")}）";
 
-            Debug.Log($"[Harness] 落地：球={ball.Name} 元素={ball.Element} 格={cell} 状态 {before} → {after}（changed={changed}）");
+            Debug.Log($"[Harness] 落地：球={ball.Name} 格={cell} 状态 {before} → {after}（changed={changed}）");
         }
 
         /// 把脚下格直接切成泥浆（不走反应，专验"格上效果"链）
@@ -323,7 +326,7 @@ namespace DeepseaOil.Presentation.Diagnostics
                 ? $"悬停格: {_hoverCell}   当前状态: {Label(_grid.StateOf(_hoverCell))}"
                 : "悬停格: (鼠标不在场景里)");
 
-            GUILayout.Label($"已注册格数: {(_grid == null ? 0 : _grid.CellCount)}   元素记录格: {(_element == null ? 0 : _element.ElementCellCount)}");
+            GUILayout.Label($"已注册格数: {(_grid == null ? 0 : _grid.CellCount)}   反应规则: {ReactionResolver.RuleCount} 条");
             GUILayout.Label("选中球种后左键点格落地：");
 
             if (_balls != null)
@@ -332,7 +335,7 @@ namespace DeepseaOil.Presentation.Diagnostics
                 {
                     ProjectileSpec ball = _balls[i];
 
-                    string caption = (i == _selectedBall ? "▶ " : "   ") + $"{ball.Name}（T{ball.Element.Temperature}/W{ball.Element.Wet}/C{ball.Element.Conductivity}/Tags{(int)ball.Element.Tags}）";
+                    string caption = (i == _selectedBall ? "▶ " : "   ") + $"{ball.Name}（{ball.Type}）";
 
                     if (GUILayout.Button(caption))
                     {

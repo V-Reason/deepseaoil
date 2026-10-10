@@ -1,35 +1,49 @@
 ---
 
+> 🔴 **2026-10 更新：本文件第 1、4、6 节的字段清单已被「战斗与元素反应重构」取代。**
+> 温湿度电三轴、`tile_effect` 效果档位表、`TileEffectValue` 多槽位结构体**已物理删除**。
+> 现在各表的确切列与语义见：
+> - `Docs/策划案_荒原复苏指南_v4.0.md` 第 8 节（配置契约附录，含全部列名速查）
+> - `Docs/表格数据配置/技术文档_配表管线.md` 第 2 节（9 张表逐表消费者）
+>
+> **下文保留的是"划界原则"（Excel 放什么 / SO 放什么 / 资产怎么寻址）与已经被执行的部分**，
+> 第四节「美术资源加载规约」仍然完全有效。
+
 ### 一、划分原则（第一性原则）
 
 为了让策划不再面对无意义的物理常数，同时让程序在 Unity Editor 调手感时无需反复导表，确立以下**铁律**：
 
 1. **Excel（策划驱动·核心玩法与规则网）**：
-   - **只放**：关卡结算数值（HP/伤害）、元素反应网（温/湿/电/Tag）、地块生效节奏（持续时间/触发间隔）、波次节奏。
+   - **只放**：核心结算数值（HP / 伤害 / 每波配给种子）、元素反应网（`element_rule` / `element_duo_reaction`）、地块生效节奏（存活秒数 / 移速倍率 / 每秒伤害）、波次节奏（三阶段时长）。
    - **严禁**：出现相机深度、像素尺寸、闪白频率、物理加速度、击退衰减曲线、资源物理路径。
+   - **现状核对**：`tile_state` 的 `slow_rate`（移速倍率）是**消费者语义**（属性乘以倍率），不是物理加速度；
+     `element_rule` 的 `impact_knockback` 用的是**格数**（冲量由执行者按格边长折算），
+     所以"击退衰减率"这类手感曲线仍然在 SO（`EnemyTuning.knockbackDecay`）里。
 2. **ScriptableObject（程序驱动·物理手感与视效体验）**：
    - **只放**：刚体运动学参数（加速度/转向衰减/最大外力）、投掷抛物线（弧高/时长/相机深度）、接触检测物理裕量、颜色调色板。
    - **收益**：Play Mode 下修改即时生效，调手感零编译、零导表成本。
 3. **美术资产寻址（程序装配·`AssetModule.Load` 懒加载）**：
    - **禁止**在 Excel 里让策划手抄 `Resources\Icons\...` 路径（易错且无校验）。
    - **约定寻址**：美术按命名规范给图，程序按枚举统一通过 `AssetModule.Load<T>($"tiles/Tile_{state}")` 按需懒加载，进缓存池，切场景自动走 LRU 释放，绝不启动全量加载。
+   - **唯一例外**：`seed.icon_key` 是**登记式 Key**（`Icons/Seed_Fire` 这种短 Key，不是 Windows 路径）。
+     当前无读取点，接 HUD 图标时它会成为消费者 —— 这是刻意留的接口，不是漏删。
 
 ---
 
 ### 二、各表格字段裁剪与划界方案（一锤定音）
 
 #### 1. `projectile.xlsx`（投掷资源表）
-- **当前痛点**：`flight_duration`, `max_height`, `max_throw_distance`, `min_throw_distance` 4 个字段在 11 行里全填了 `0.6, 2, 5, 0.4`。策划根本不调这个，这纯粹是抛物线手感。
-- **划界改动**：
-  - **移出至 SO (`ThrowTuning.asset`)**：`flight_duration`（基准飞行时长）、`max_height`（弧高）、`max_throw_distance`（射程）、`min_throw_distance`（最小起掷距）。
-  - **保留在 Excel**：
-    | 字段                          | 类型          | 说明                                                  |
-    | :---------------------------- | :------------ | :---------------------------------------------------- |
-    | `id`                          | `BallType`    | 球种枚举（纯水/热水/寒水/干土/湿土/沙/粘土/各类种子） |
-    | `name`                        | `string`      | 显示名称                                              |
-    | `type`                        | `ElementType` | 大类（水 / 土 / 种子）                                |
-    | `temp` / `wet` / `conductive` | `int`         | 元素三数值（-6~6 / 0~6 / 0~2）                        |
-    | `tags`                        | `ElementTag`  | 标签位（含土/含沙/含植物等）                          |
+
+已完成：4 个抛物线字段已移出至 SO（`ThrowTuning.asset`）。
+**本轮进一步收缩**：元素三数值与标签位已删除，球种只剩两种。
+
+| 字段 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `id` | `BallType` | 球种枚举（**只剩 `Water` 纯水 / `Earth` 纯土**） |
+| `name` | `string!` | 显示名 |
+| `type` | `ElementType` | 大类标记（水 / 土）；只作语义标记，不参与落地判定 |
+
+> 落地结果由 `element_rule` 查表决定，球本身不再携带任何"地形倾向"。
 
 #### 2. `player.xlsx`（玩家配置表）
 - **当前痛点**：策划案 3.0 已锁定为“3 颗心，归零即死”。表里填 `100` 血、`10` 伤害已脱节；且 `knockback_impulse`, `knockback_speed_limit`, `contact_radius` 全是刚体物理参数。
@@ -62,38 +76,82 @@
     | `contact_damage` | `float`  | 接触伤害（固定为 1）                           |
 
 #### 4. `tile_state.xlsx`（地块状态表）
-- **当前痛点**：`icon` 填的是 Windows 相对文件路径，策划难记且运行期没用；`willSpread` 标记代码明确“本轮只读不做”。
-- **划界改动**：
-  - **彻底剔除字段**：
-    - 删掉 `icon`：贴图走程序约定动态加载 `AssetModule.Load<TileBase>($"tiles/Tile_{Id}")`。
-    - 删掉 `willSpread`：本轮不做蔓延，避免策划误配。
-  - **保留在 Excel**：
-    | 字段                             | 类型            | 说明                         |
-    | :------------------------------- | :-------------- | :--------------------------- |
-    | `id`                             | `TileStateType` | 地块状态枚举                 |
-    | `name`                           | `string`        | 显示名                       |
-    | `duration`                       | `float`         | 持续秒数（-1 为永久）        |
-    | `canReact`                       | `bool`          | 是否参与后续反应             |
-    | `temp` / `wet` / `cond` / `tags` | 数值/枚举       | 该地块所拥有的地形元素四件套 |
-    | `effects` / `effectValuePos`     | 列表            | 挂载的效果列表及档位         |
-    | `tip`                            | `string`        | 仅作策划备注文档用           |
+
+已完成：`icon` / `willSpread` 已剔除（贴图走 `tiles/Tile_{Id}` 约定）。
+**本轮重写**：地形元素四件套与效果清单全部删除，改为「地面残留」四项 + 导通标记。
+
+| 字段 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `id` | `TileStateType` | 地块状态枚举（16 项） |
+| `name` | `string!` | 显示名（HUD / 诊断面板读数） |
+| `duration` | `float` | 存活秒数（-1 为永久） |
+| `slow_rate` | `float` | 踩在上面的移速倍率（1 = 不减速） |
+| `dot_damage` | `int` | 每秒伤害（0 = 无伤害） |
+| `is_obstacle` | `bool` | 物理阻挡墙体 |
+| `is_conductor` | `bool` | **网格连锁导通体**（水·土·泥浆·稀泥为真） |
+
+> **权责边界**：这张表只管"留在地上之后"。**落地那一下的冲击归 `element_rule`**，
+> 两张表不重叠、不互斥 —— 不再有"规则表有效果就顶掉地块表效果"的补丁逻辑。
 
 #### 5. `wave.xlsx`（波次配置表）
-- **当前痛点**：策划案 3.0 规定“备战 10s / 战斗 30s / 结算 8s”；表里 `spawn_radius` 是刷怪外环半径（屏幕正交尺寸相关，属相机与视口参数）。
-- **划界改动**：
-  - **移出至 SO (`WaveTuning.asset`)**：`spawn_radius`（视口边缘生成距离）。
-  - **保留在 Excel**：
-    | 字段               | 类型    | 说明                   |
-    | :----------------- | :------ | :--------------------- |
-    | `id`               | `int`   | 波次编号（1, 2, 3...） |
-    | `prep_time`        | `float` | 备战时长（默认 10s）   |
-    | `battle_time`      | `float` | 战斗时长（默认 30s）   |
-    | `settle_time`      | `float` | 结算时长（默认 8s）    |
-    | `enemies_per_wave` | `int`   | 本波怪量               |
-    | `spawn_interval`   | `float` | 刷怪间隔（秒）         |
 
-#### 6. `element_rule.xlsx`（元素反应规则表）与 `tile_effect.xlsx`（效果参数表）
-- **判定**：**100% 留在 Excel**。这是策划的核心资产，表头结构无需做大破坏，保持现有逻辑。
+已完成：`spawn_radius` **没有**移出（刷怪环半径留在表里，它决定"怪从多远压过来"，属玩法节奏）。
+**本轮重写为三阶段时钟 + 战备配给**：
+
+| 字段 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `id` | `int` | 波次编号（1, 2, 3...） |
+| `name` | `string!` | 显示名（HUD 预警文案） |
+| `prep_time` | `float` | 备战时长（默认 10s）：发配给、让玩家铺地形 |
+| `battle_time` | `float` | 战斗时长（默认 30s）：按 `spawn_interval` 出怪 |
+| `settle_time` | `float` | 结算时长（默认 8s）：**必须等残余敌人清空**才推进 |
+| `enemies_per_wave` | `int!` | 本波怪量 |
+| `spawn_interval` | `float!` | 刷怪间隔（秒），下限 0.05 |
+| `spawn_radius` | `float!` | 出生环半径 |
+| `grant_seed` | `SeedType` | **本波备战期配给的战备种子**（可留空 = 不发） |
+
+> 跑完全表后**循环回第一行**并继续递增波次号（无尽模式），没有"通关"终态。
+
+#### 6. `element_rule.xlsx`（一级反应）与 `element_duo_reaction.xlsx`（二级反应）
+
+**判定：100% 留在 Excel。这是策划的核心资产。** 本轮**重写了表结构**（不是"保持原状"）：
+
+`element_rule.xlsx` — 球砸地面：
+
+| 字段 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `id` | `int` | 主键 |
+| `source_tile` | `TileStateType` | 作用的地块原状态 |
+| `ball_type` | `BallType` | 投掷的球种 |
+| `result_tile` | `TileStateType` | 生成的新地貌（等于原格 = 地形不变、只结算冲击） |
+| `impact_damage` | `int` | **落地瞬间伤害，当帧结算** |
+| `impact_knockback` | `float` | 落地瞬间击退（格） |
+| `impact_stun` | `float` | 落地瞬间麻痹（秒） |
+| `trigger_chain` | `bool` | 是否触发网格连锁泛洪 |
+
+> 🔴 **业务唯一键是 `(source_tile, ball_type)`**：`ReactionResolver` 按它建哈希表做 O(1) 查询，
+> 重复配置会被当场 `LogError` 报出（后者不算数）。`priority` 列**已删除** ——
+> 它曾经叫"优先级"而实际匹配顺序由表内行序决定，是纯误导。
+> `impact_stun` **不要加 `!`**：它有 8 行天然是 0，加 `!` 会导表失败。
+
+`element_duo_reaction.xlsx` — 地面 × 地面（新表）：
+
+| 字段 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `id` | `int` | 主键 |
+| `elem_a` / `elem_b` | `TileStateType` | 两个元素发生器地貌（**无序对**） |
+| `result_tile` | `TileStateType` | 激发出的地貌 |
+| `impact_damage` | `int` | 瞬发伤害 |
+| `impact_knockback` | `float` | 瞬发击退（格） |
+| `result_duration` | `float` | 结果存续秒数 |
+| `effect_radius` | `float` | 波及半径（格，欧氏距离） |
+| `trigger_chain` | `bool` | 是否沿网格继续泛洪 |
+
+> `(elem_a, elem_b)` 与 `(elem_b, elem_a)` 是同一条：`DuoReactionCatalog` 建**双向字典**，
+> 重复配置同样当场报错。
+
+**已退役**：`tile_effect.xlsx`（效果多档参数表）。效果不再是"效果号 + 档位"，
+而是直接写在 `element_rule`（落地）与 `tile_state`（残留）两张表里。
 
 ---
 

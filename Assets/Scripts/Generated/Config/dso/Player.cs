@@ -30,6 +30,11 @@ public sealed partial class Player : Luban.BeanBase
         { if(!_buf["knockback_impulse"].IsNumber) { throw new SerializationException(); }  KnockbackImpulse = _buf["knockback_impulse"]; }
         { if(!_buf["knockback_speed_limit"].IsNumber) { throw new SerializationException(); }  KnockbackSpeedLimit = _buf["knockback_speed_limit"]; }
         { if(!_buf["contact_radius"].IsNumber) { throw new SerializationException(); }  ContactRadius = _buf["contact_radius"]; }
+        { if(!_buf["water_capacity"].IsNumber) { throw new SerializationException(); }  WaterCapacity = _buf["water_capacity"]; }
+        { if(!_buf["water_start"].IsNumber) { throw new SerializationException(); }  WaterStart = _buf["water_start"]; }
+        { if(!_buf["earth_capacity"].IsNumber) { throw new SerializationException(); }  EarthCapacity = _buf["earth_capacity"]; }
+        { if(!_buf["earth_start"].IsNumber) { throw new SerializationException(); }  EarthStart = _buf["earth_start"]; }
+        { if(!_buf["life_heal_interval"].IsNumber) { throw new SerializationException(); }  LifeHealInterval = _buf["life_heal_interval"]; }
     }
 
     public static Player DeserializePlayer(JSONNode _buf)
@@ -77,6 +82,26 @@ public sealed partial class Player : Luban.BeanBase
     /// 敌人贴身判定的圆心距（世界单位）
     /// </summary>
     public readonly float ContactRadius;
+    /// <summary>
+    /// 水弹药上限
+    /// </summary>
+    public readonly int WaterCapacity;
+    /// <summary>
+    /// 开局水弹药
+    /// </summary>
+    public readonly int WaterStart;
+    /// <summary>
+    /// 土弹药上限
+    /// </summary>
+    public readonly int EarthCapacity;
+    /// <summary>
+    /// 开局土弹药
+    /// </summary>
+    public readonly int EarthStart;
+    /// <summary>
+    /// 神泉回血所需静止秒数
+    /// </summary>
+    public readonly float LifeHealInterval;
    
     public const int __ID__ = 571649775;
     public override int GetTypeId() => __ID__;
@@ -98,6 +123,11 @@ public sealed partial class Player : Luban.BeanBase
         + "knockbackImpulse:" + KnockbackImpulse + ","
         + "knockbackSpeedLimit:" + KnockbackSpeedLimit + ","
         + "contactRadius:" + ContactRadius + ","
+        + "waterCapacity:" + WaterCapacity + ","
+        + "waterStart:" + WaterStart + ","
+        + "earthCapacity:" + EarthCapacity + ","
+        + "earthStart:" + EarthStart + ","
+        + "lifeHealInterval:" + LifeHealInterval + ","
         + "}";
     }
 }

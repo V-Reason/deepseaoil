@@ -43,9 +43,13 @@ public partial class Tables
     /// </summary>
     public dso.TbElementRule TbElementRule {get; }
     /// <summary>
-    /// 反应效果
+    /// 种子基建配置表
     /// </summary>
-    public dso.TbTileEffect TbTileEffect {get; }
+    public dso.TbSeed TbSeed {get; }
+    /// <summary>
+    /// 二级元素跨界反应表
+    /// </summary>
+    public dso.TbElementDuoReaction TbElementDuoReaction {get; }
 
     public Tables(System.Func<string, JSONNode> loader)
     {
@@ -56,7 +60,8 @@ public partial class Tables
         TbWave = new dso.TbWave(loader("dso_tbwave"));
         TbTileInitial = new dso.TbTileInitial(loader("dso_tbtileinitial"));
         TbElementRule = new dso.TbElementRule(loader("dso_tbelementrule"));
-        TbTileEffect = new dso.TbTileEffect(loader("dso_tbtileeffect"));
+        TbSeed = new dso.TbSeed(loader("dso_tbseed"));
+        TbElementDuoReaction = new dso.TbElementDuoReaction(loader("dso_tbelementduoreaction"));
         ResolveRef();
     }
     
@@ -69,7 +74,8 @@ public partial class Tables
         TbWave.ResolveRef(this);
         TbTileInitial.ResolveRef(this);
         TbElementRule.ResolveRef(this);
-        TbTileEffect.ResolveRef(this);
+        TbSeed.ResolveRef(this);
+        TbElementDuoReaction.ResolveRef(this);
     }
 }
 

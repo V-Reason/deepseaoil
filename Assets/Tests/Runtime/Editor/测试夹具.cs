@@ -45,27 +45,110 @@ namespace DeepseaOil.Tests
                 "{\"id\":0,\"name\":\"纯水\"," +
                 "\"type\":0,\"temp\":0,\"wet\":3,\"conductive\":1,\"tags\":0}"));
 
-        /// <summary>一行敌人：显示名"测试敌人"、追击满速 3.6、耐久 3。半径 / 加速度 / 击退衰减 / 停止距离 / 脱战距离已搬进 <c>EnemyTuning</c> 调参 SO，表里不再有这些列。</summary>
-        public static Enemy EnemyRow()
-            => new Enemy(JSON.Parse("{\"id\":1,\"name\":\"测试敌人\",\"max_speed\":3.6,\"hp\":3}"));
+        /// <summary>一行敌人：显示名"测试敌人"、追击满速 3.6、耐久 3、贴身伤害 1。半径 / 加速度 / 击退衰减 / 停止距离 / 脱战距离已搬进 <c>EnemyTuning</c> 调参 SO。</summary>
+        public static Enemy EnemyRow(int id = 1, int hp = 3, int contactDamage = 1)
+            => new Enemy(JSON.Parse(
+                $"{{\"id\":{id},\"name\":\"测试敌人\",\"max_speed\":3.6,\"hp\":{hp},\"contact_damage\":{contactDamage}}}"));
 
-        /// <summary>一行玩家：血量 3、接触伤害 1、无敌 0.8、重试 1.2、攻击间隔 0.5、击退 12/12、接触半径 1。</summary>
+        /// <summary>一行玩家：血量 3、贴身伤害 1、无敌 0.8、重试 1.2、攻击间隔 0.35、击退 12/12、接触半径 1、水/土各 5、神泉 3 秒。</summary>
         public static Player PlayerRow()
             => new Player(JSON.Parse(
                 "{\"id\":1,\"name\":\"玩家\",\"max_hp\":3,\"contact_damage\":1," +
-                "\"invulnerable_duration\":0.8,\"retry_delay\":1.2,\"attack_interval\":0.5," +
-                "\"knockback_impulse\":12,\"knockback_speed_limit\":12,\"contact_radius\":1}"));
+                "\"invulnerable_duration\":0.8,\"retry_delay\":1.2,\"attack_interval\":0.35," +
+                "\"knockback_impulse\":12,\"knockback_speed_limit\":12,\"contact_radius\":1," +
+                "\"water_capacity\":5,\"water_start\":5,\"earth_capacity\":5,\"earth_start\":5," +
+                "\"life_heal_interval\":3}"));
 
-        /// <summary>一行波次：4 只一波、间隔 0.25、开局等 1.5、清完等 2.5、出生半径 5。</summary>
-        public static Wave WaveRow()
+        /// <summary>一行波次：备战 10 / 战斗 30 / 结算 8、6 只、间隔 0.4、出生半径 5、配给火种子。</summary>
+        public static Wave WaveRow(int id = 1, int enemies = 6, int grantSeed = 1)
             => new Wave(JSON.Parse(
-                "{\"id\":1,\"name\":\"默认\",\"enemies_per_wave\":4,\"spawn_interval\":0.25," +
-                "\"initial_delay\":1.5,\"respawn_delay\":2.5,\"spawn_radius\":5}"));
+                $"{{\"id\":{id},\"name\":\"测试波次\",\"prep_time\":10,\"battle_time\":30,\"settle_time\":8," +
+                $"\"enemies_per_wave\":{enemies},\"spawn_interval\":0.4,\"spawn_radius\":5,\"grant_seed\":{grantSeed}}}"));
+
+        /// <summary>一行地块状态；默认是一个"永久、不减速、无伤害、不导通"的空地。</summary>
+        public static TileState TileStateRow(
+            int id,
+            float duration = -1f,
+            float slowRate = 1f,
+            int dotDamage = 0,
+            bool isObstacle = false,
+            bool isConductor = false,
+            string name = "测试地块")
+            => new TileState(JSON.Parse(
+                $"{{\"id\":{id},\"name\":\"{name}\",\"duration\":{duration},\"slow_rate\":{slowRate}," +
+                $"\"dot_damage\":{dotDamage},\"is_obstacle\":{(isObstacle ? "true" : "false")}," +
+                $"\"is_conductor\":{(isConductor ? "true" : "false")}}}"));
+
+        /// <summary>一行元素反应规则：原格地貌 + 球种 → 结果地貌与落地冲击。</summary>
+        public static ElementRule ElementRuleRow(
+            int id,
+            int sourceTile,
+            int ballType,
+            int resultTile,
+            int damage = 0,
+            float knockback = 0f,
+            float stun = 0f,
+            bool triggerChain = false)
+            => new ElementRule(JSON.Parse(
+                $"{{\"id\":{id},\"source_tile\":{sourceTile},\"ball_type\":{ballType}," +
+                $"\"result_tile\":{resultTile},\"impact_damage\":{damage},\"impact_knockback\":{knockback}," +
+                $"\"impact_stun\":{stun},\"trigger_chain\":{(triggerChain ? "true" : "false")}}}"));
+
+        /// <summary>一行二级元素反应：两个发生器地貌 → 激发的产物与波及。</summary>
+        public static ElementDuoReaction DuoRow(
+            int id,
+            int elemA,
+            int elemB,
+            int resultTile,
+            int damage = 0,
+            float knockback = 0f,
+            float duration = 3f,
+            float radius = 1f,
+            bool triggerChain = true)
+            => new ElementDuoReaction(JSON.Parse(
+                $"{{\"id\":{id},\"elem_a\":{elemA},\"elem_b\":{elemB},\"result_tile\":{resultTile}," +
+                $"\"impact_damage\":{damage},\"impact_knockback\":{knockback}," +
+                $"\"result_duration\":{duration},\"effect_radius\":{radius}," +
+                $"\"trigger_chain\":{(triggerChain ? "true" : "false")}}}"));
+
+        /// <summary>一行种子基建配置。</summary>
+        public static Seed SeedRow(int id, int spawnTile, string name = "测试种子", string iconKey = "Icons/Seed_Test")
+            => new Seed(JSON.Parse(
+                $"{{\"id\":{id},\"name\":\"{name}\",\"spawn_tile\":{spawnTile},\"icon_key\":\"{iconKey}\"}}"));
 
         /// <summary>一行关卡初始格（状态 1 = 空地）。</summary>
         public static TileInitial TileInitialRow(int cellX, int cellY, int stateId)
             => new TileInitial(JSON.Parse(
                 $"{{\"id\":1,\"cell_x\":{cellX},\"cell_y\":{cellY},\"state_id\":{stateId}}}"));
+
+        // 下面两个是**包装件**工厂：求解器与二级反应查询表只吃 Spec，不吃生成行
+
+        /// <summary>一条元素反应规则（已包装）。</summary>
+        public static ElementRuleSpec ElementRuleSpecOf(
+            int id,
+            int sourceTile,
+            int ballType,
+            int resultTile,
+            int damage = 0,
+            float knockback = 0f,
+            float stun = 0f,
+            bool triggerChain = false)
+            => new ElementRuleSpec(
+                ElementRuleRow(id, sourceTile, ballType, resultTile, damage, knockback, stun, triggerChain));
+
+        /// <summary>一条二级元素反应（已包装）。</summary>
+        public static DuoReactionSpec DuoSpecOf(
+            int id,
+            int elemA,
+            int elemB,
+            int resultTile,
+            int damage = 0,
+            float knockback = 0f,
+            float duration = 3f,
+            float radius = 1f,
+            bool triggerChain = true)
+            => new DuoReactionSpec(
+                DuoRow(id, elemA, elemB, resultTile, damage, knockback, duration, radius, triggerChain));
     }
 
     /// <summary>

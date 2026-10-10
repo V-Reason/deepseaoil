@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace DeepseaOil.Data
 {
-    /// <summary>enemy 表列 id/name/max_speed/hp；radius/acceleration/knockback_decay/stop_distance/chase_range 退役归 EnemyTuning（世界单位、单位/秒、Hz）；FlashHz 取 VisualPalette；滑停同源 knockbackDecay</summary>
+
     public sealed class EnemySpec
     {
         private readonly Enemy _row;
@@ -44,6 +44,9 @@ namespace DeepseaOil.Data
         public float ChaseRange => _tuning.chaseRange;
 
         public int Hp => _row.Hp;
+
+        /// <summary>贴身一次对玩家造成的伤害；敌人伤害的唯一权威，玩家表的 contact_damage 不用在这条链上</summary>
+        public int ContactDamage => _row.ContactDamage;
 
         public float FlashHz => ConfigModule.Visuals != null ? ConfigModule.Visuals.enemyFlashHz : 4f;
 

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace DeepseaOil.Logic.Grid
 {
-    /// <summary>格子空间查询：邻接，静态纯函数；缓冲由调用方给，先被 Clear</summary>
+
     public static class GridQuery
     {
         public static void GetNeighbors8(Vector3Int cell, List<Vector3Int> buffer)
@@ -21,6 +21,18 @@ namespace DeepseaOil.Logic.Grid
                     buffer.Add(new Vector3Int(cell.x + dx, cell.y + dy, cell.z));
                 }
             }
+        }
+
+        public static void GetNeighbors4(Vector3Int cell, List<Vector3Int> buffer)
+        {
+            if (buffer == null) return;
+
+            buffer.Clear();
+
+            buffer.Add(new Vector3Int(cell.x, cell.y - 1, cell.z));
+            buffer.Add(new Vector3Int(cell.x - 1, cell.y, cell.z));
+            buffer.Add(new Vector3Int(cell.x + 1, cell.y, cell.z));
+            buffer.Add(new Vector3Int(cell.x, cell.y + 1, cell.z));
         }
     }
 }

@@ -2,8 +2,8 @@ using cfg.dso;
 
 namespace DeepseaOil.Data
 {
-    /// <summary>玩家取值边界，合并 player 表行与 PlayerConfig SO</summary>
-    /// <remarks>表行管血量与受击，SO管移动与冲刺，装配期折算一次</remarks>
+    // <summary>玩家取值边界</summary>
+    // <remarks>表行管血量与受</remarks>
     public sealed class PlayerSpec
     {
         private readonly Player _row;
@@ -34,28 +34,43 @@ namespace DeepseaOil.Data
 
         public float KnockbackSpeedLimit => _row.KnockbackSpeedLimit;
 
-        /// <summary>敌人贴上圆心距，世界单位，略小于两半径之和</summary>
+        // <summary>敌人贴上圆心距</summary>
         public float ContactRadius => _row.ContactRadius;
 
-        /// <remarks>移动与冲刺参数，装配期折算快照，改SO不生效</remarks>
+        // <summary>水弹药上限</summary>
+        public int WaterCapacity => _row.WaterCapacity;
+
+        // <summary>开局水弹药</summary>
+        public int WaterStart => _row.WaterStart;
+
+        // <summary>土弹药上限</summary>
+        public int EarthCapacity => _row.EarthCapacity;
+
+        // <summary>开局土弹药</summary>
+        public int EarthStart => _row.EarthStart;
+
+        // <summary>生命神泉回 1</summary>
+        public float LifeHealInterval => _row.LifeHealInterval;
+
+        // <remarks>移动与冲刺参数</remarks>
         public PlayerConfig Config => _config;
 
         public ProjectileSpec Ball { get; }
 
         public bool SnapToEightDirections => _config.snapToEightDirections;
 
-        /// <summary>输入缓冲容量，秒，须≥各输入窗口</summary>
+        // <summary>输入缓冲容量</summary>
         public float InputBufferSeconds => _config.inputBufferTime;
 
         public float DashCooldownSeconds => _config.dashCooldown;
 
         public float DashBufferSeconds => _config.dashBufferTime;
 
-        /// <summary>相机深度，世界单位，取水球行ThrowTuning，缺失=100</summary>
+        // <summary>相机深度</summary>
         public float CameraPlaneDepth
             => Ball != null && Ball.Tuning != null ? Ball.Tuning.cameraPlaneDepth : 100f;
 
-        /// <summary>投掷射程上限，世界单位，取水球行，缺失=0=不限</summary>
+        // <summary>投掷射程上限</summary>
         public float MaxThrowDistance => Ball != null ? Ball.MaxThrowDistance : 0f;
     }
 }

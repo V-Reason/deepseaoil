@@ -14,7 +14,7 @@ namespace cfg.dso
     public enum TileStateType
     {
         /// <summary>
-        /// 无
+        /// 无状态
         /// </summary>
         None = 0,
         /// <summary>
@@ -30,10 +30,6 @@ namespace cfg.dso
         /// </summary>
         MudSkid = 3,
         /// <summary>
-        /// 冰沙
-        /// </summary>
-        Smoothie = 4,
-        /// <summary>
         /// 结冰
         /// </summary>
         Freeze = 5,
@@ -42,39 +38,15 @@ namespace cfg.dso
         /// </summary>
         TerracottaBrick = 6,
         /// <summary>
-        /// 冻土
-        /// </summary>
-        FrozenEarth = 7,
-        /// <summary>
         /// 蒸汽
         /// </summary>
         Steam = 8,
         /// <summary>
-        /// 导电
-        /// </summary>
-        ConductElectricity = 9,
-        /// <summary>
-        /// 藤蔓
-        /// </summary>
-        Vine = 10,
-        /// <summary>
-        /// 玻璃
-        /// </summary>
-        Glass = 11,
-        /// <summary>
-        /// 燃烧
-        /// </summary>
-        Burn = 12,
-        /// <summary>
-        /// 灰烬
-        /// </summary>
-        Ashes = 13,
-        /// <summary>
-        /// 基础水地块
+        /// 基础水
         /// </summary>
         BasicWater = 14,
         /// <summary>
-        /// 基础土地块
+        /// 基础土
         /// </summary>
         BasicEarth = 15,
         /// <summary>
@@ -93,6 +65,22 @@ namespace cfg.dso
         /// 基础植物区
         /// </summary>
         BasicPlant = 19,
+        /// <summary>
+        /// 导电区
+        /// </summary>
+        ConductZone = 20,
+        /// <summary>
+        /// 燎原火海
+        /// </summary>
+        FlameField = 21,
+        /// <summary>
+        /// 带电荆棘
+        /// </summary>
+        ChargedThorn = 22,
+        /// <summary>
+        /// 霜冻冰刺
+        /// </summary>
+        FrostSpike = 23,
     }
 
 } 

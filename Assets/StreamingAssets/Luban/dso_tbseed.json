@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "name": "火种子",
+    "spawn_tile": 16,
+    "icon_key": "Icons/Seed_Fire"
+  },
+  {
+    "id": 2,
+    "name": "电种子",
+    "spawn_tile": 18,
+    "icon_key": "Icons/Seed_Elec"
+  },
+  {
+    "id": 3,
+    "name": "冰种子",
+    "spawn_tile": 17,
+    "icon_key": "Icons/Seed_Ice"
+  },
+  {
+    "id": 4,
+    "name": "植物种子",
+    "spawn_tile": 19,
+    "icon_key": "Icons/Seed_Plant"
+  }
+]

@@ -1,311 +1,146 @@
 [
   {
+    "id": 1,
+    "name": "空地",
+    "duration": -1,
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 14,
+    "name": "基础水",
+    "duration": -1,
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": true
+  },
+  {
+    "id": 15,
+    "name": "基础土",
+    "duration": -1,
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": true
+  },
+  {
     "id": 2,
     "name": "普通泥浆",
     "duration": 10,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      1
-    ],
-    "effectValuePos": [
-      1
-    ],
-    "tip": "减速50%"
+    "slow_rate": 0.5,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": true
   },
   {
     "id": 3,
     "name": "稀泥",
-    "duration": 10,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "滑行2格"
-  },
-  {
-    "id": 4,
-    "name": "冰沙",
     "duration": 8,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      1,
-      8
-    ],
-    "effectValuePos": [
-      1,
-      1
-    ],
-    "tip": "减速50%|瞬时伤害1"
-  },
-  {
-    "id": 5,
-    "name": "结冰",
-    "duration": 15,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "滑行1格"
-  },
-  {
-    "id": 6,
-    "name": "陶砖",
-    "duration": 20,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      5
-    ],
-    "effectValuePos": [
-      1
-    ],
-    "tip": "阻挡|击退1格"
-  },
-  {
-    "id": 7,
-    "name": "冻土",
-    "duration": 20,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      5
-    ],
-    "effectValuePos": [
-      1
-    ],
-    "tip": "阻挡"
-  },
-  {
-    "id": 8,
-    "name": "蒸汽",
-    "duration": 3,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      9
-    ],
-    "effectValuePos": [
-      1
-    ],
-    "tip": "持续伤害|击退2格"
-  },
-  {
-    "id": 9,
-    "name": "导电",
-    "duration": 3,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      9,
-      6
-    ],
-    "effectValuePos": [
-      1,
-      1
-    ],
-    "tip": "持续伤害|麻痹抽搐1.5s"
-  },
-  {
-    "id": 10,
-    "name": "藤蔓",
-    "duration": 15,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      5,
-      7
-    ],
-    "effectValuePos": [
-      1,
-      1
-    ],
-    "tip": "阻挡|缠绕定身15s"
-  },
-  {
-    "id": 11,
-    "name": "玻璃",
-    "duration": 0,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "击退1格|瞬时伤害1次即销毁"
-  },
-  {
-    "id": 12,
-    "name": "燃烧",
-    "duration": 3,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      9
-    ],
-    "effectValuePos": [
-      2
-    ],
-    "tip": "持续伤害|击退1格|清除植物"
-  },
-  {
-    "id": 13,
-    "name": "灰烬",
-    "duration": 5,
-    "canReact": false,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "无"
-  },
-  {
-    "id": 14,
-    "name": "基础水地块",
-    "duration": -1,
-    "canReact": true,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "温湿度继承"
-  },
-  {
-    "id": 15,
-    "name": "基础土地块",
-    "duration": -1,
-    "canReact": true,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 1,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "温湿度继承"
+    "slow_rate": 1.2,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": true
   },
   {
     "id": 16,
     "name": "基础火池",
     "duration": -1,
-    "canReact": true,
-    "temp": 4,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "无"
-  },
-  {
-    "id": 17,
-    "name": "基础冰面",
-    "duration": -1,
-    "canReact": true,
-    "temp": -4,
-    "wet": 2,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "无"
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": false
   },
   {
     "id": 18,
     "name": "基础电源",
     "duration": -1,
-    "canReact": true,
-    "temp": 1,
-    "wet": 0,
-    "cond": 2,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "无"
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 17,
+    "name": "基础冰面",
+    "duration": -1,
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": false
   },
   {
     "id": 19,
     "name": "基础植物区",
     "duration": -1,
-    "canReact": true,
-    "temp": 0,
-    "wet": 1,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      5
-    ],
-    "effectValuePos": [
-      1
-    ],
-    "tip": "阻挡"
+    "slow_rate": 0.7,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": false
   },
   {
-    "id": 1,
-    "name": "空地",
+    "id": 6,
+    "name": "陶砖",
+    "duration": 15,
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": true,
+    "is_conductor": false
+  },
+  {
+    "id": 5,
+    "name": "结冰",
+    "duration": 8,
+    "slow_rate": 1,
+    "dot_damage": 0,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 8,
+    "name": "蒸汽",
+    "duration": 3,
+    "slow_rate": 1,
+    "dot_damage": 1,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 20,
+    "name": "导电区",
+    "duration": 3,
+    "slow_rate": 1,
+    "dot_damage": 1,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 21,
+    "name": "燎原火海",
+    "duration": 3,
+    "slow_rate": 1,
+    "dot_damage": 2,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 22,
+    "name": "带电荆棘",
     "duration": -1,
-    "canReact": true,
-    "temp": 0,
-    "wet": 0,
-    "cond": 0,
-    "tags": 0,
-    "effects": [
-      0
-    ],
-    "effectValuePos": [],
-    "tip": "无"
+    "slow_rate": 0.4,
+    "dot_damage": 1,
+    "is_obstacle": false,
+    "is_conductor": false
+  },
+  {
+    "id": 23,
+    "name": "霜冻冰刺",
+    "duration": -1,
+    "slow_rate": 0.5,
+    "dot_damage": 1,
+    "is_obstacle": false,
+    "is_conductor": false
   }
 ]

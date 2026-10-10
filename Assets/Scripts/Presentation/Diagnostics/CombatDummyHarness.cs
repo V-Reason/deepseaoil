@@ -155,13 +155,15 @@ namespace DeepseaOil.Presentation.Diagnostics
 
             _registry = new EnemyCellRegistry();
 
-            var element = new TileElementReactor(ConfigModule.GetElementRules());
+            ReactionResolver.Initialize(ConfigModule.GetElementRules());
+
+            TileChainReactor.Clear();
 
             _grid = new GridLogic(
                 adapter.ReadGeometry(),
                 ConfigModule.GetAllTileStates(),
                 CreateTileState,
-                element,
+                ConfigModule.GetDuoReactions(),
                 _registry);
 
             adapter.Attach();
@@ -310,7 +312,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (keyboard.digit3Key.wasPressedThisFrame) Knockback();
             if (keyboard.digit4Key.wasPressedThisFrame) Kill();
             if (keyboard.digit5Key.wasPressedThisFrame) CutTileUnderfoot(TileStateType.Mud, "泥浆");
-            if (keyboard.digit6Key.wasPressedThisFrame) CutTileUnderfoot(TileStateType.Burn, "燃烧");
+            if (keyboard.digit6Key.wasPressedThisFrame) CutTileUnderfoot(TileStateType.FlameField, "燎原火海");
         }
 
         /// [1] 单次受击：验扣耐久与头顶数字
@@ -427,7 +429,7 @@ namespace DeepseaOil.Presentation.Diagnostics
             if (GUILayout.Button("[3] 施加击退 up × 8（冲量滑停）")) Knockback();
             if (GUILayout.Button("[4] 致死碎裂 999（Shatter 碎片）")) Kill();
             if (GUILayout.Button("[5] 脚下刷泥浆（格上自动减速）")) CutTileUnderfoot(TileStateType.Mud, "泥浆");
-            if (GUILayout.Button("[6] 脚下点燃燃烧（格上持续掉血）")) CutTileUnderfoot(TileStateType.Burn, "燃烧");
+            if (GUILayout.Button("[6] 脚下生火海（格上持续掉血）")) CutTileUnderfoot(TileStateType.FlameField, "燎原火海");
 
             GUILayout.Label($"最近一次: {_lastAction}");
 

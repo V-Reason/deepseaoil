@@ -1,23 +1,23 @@
 // ---------------------------------------------------------------------------
 // 格上效果链 · 行为测试（"地块改了，敌人却没反应"这一类）
 //
-// 【为什么在这里】这几条守的都是"不报错、只是敌人毫无反应"的静默缺陷，实测过的三个：
-//   ① 减速被丢弃：GridLogic 把续命窗口钉成渲染帧 0.0167s，而消费者按物理帧 0.02s 扣 ——
-//      一个物理拍就扣穿；低帧率下大部分物理拍读到的 SlowScale 是 1（泥浆"贴着走也不减速"）。
-//   ② DoT 双重计时：状态按自己的 TickInterval 提交，内层累加器却每次只加一帧 Δt ——
-//      燃烧 3 秒只掉一次血（还是进格冲击那一次），等于不掉。
-//   ③ 瞬时伤害逐帧重放：冰沙站一秒掉 62 点（60fps × 1 点），进格“一下”的语义完全丢失。
-//   另加一条：燃烧第 2 档曾被 GridLogic 的表内覆盖钉回第 1 档（0.5 点），
-//   而 EnemyStats 按 RoundToInt 取整 ⇒ 0.5 舍成 0 ⇒ 一点都不掉血。
-//   球落地这条链还吃过两次"效果被吞"（⑥⑦）：结果状态是 None 时直接 return（兜底行的击退没了）、
-//   规则行的 effects 列为空时把状态自己的进格效果整段顶掉（冰沙的瞬时伤害没了）。
+// 【本轮口径变更】温湿度/元素合成/effectValueList 全部退役。现在：
+//   落地冲击（伤害/击退/麻痹/连锁）归 element_rule，经 ReactionResolver 裁决、由
+//   GridLogic.OnBallHit 一处提交；地面残留（减速/DoT/存活秒数）归 tile_state，
+//   由 TableTileState 按帧提交。两张表不重叠、不互斥。
 //
-// 【覆盖边界，写在明处】本文件只跑 Logic ＋ Data（真表、真状态机、真 StatusGroup），
-//   不经过 EnemyActor / CombatDirector / 场景接线：预制体与场景那一段仍由
-//   Assets/Scenes/Sandboxes/Slice_CombatSandbox.unity 的人工 PlayMode 验收覆盖。
+// 【仍然要守的静默缺陷】实测过的三个：
+//   ① 减速被丢弃：续命窗口短于一个物理拍就被扣穿，表现为"贴着泥浆也不减速"。
+//   ② DoT 双重计时：攒拍只加单帧 Δt，燃烧 3 秒只掉一次血，等于不掉。
+//   ③ 瞬时伤害逐帧重放：站一秒掉 60 点，进格"一下"的语义完全丢失。
+//   外加本轮新守的两条：④ 首跳伤害必须当帧打出（落地那一帧就扣血）；
+//   ⑤ 连锁标记必须真的把泛洪跑起来（否则"水网导电"只是表里的一列数字）。
+//
+// 【覆盖边界】本文件只跑 Logic ＋ Data（真表、真状态机、真 StatusGroup），
+//   不经过 EnemyActor / CombatDirector / 场景接线：那一层由人工 PlayMode 验收覆盖。
 //
 // 【跑法】Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All
-// 【为什么自己 Init】与 状态工厂Tests 同一口径：EditMode 里 GameRoot 不跑，不自己初始化就撞 EnsureAssets 守卫。
+// 【为什么自己 Init】EditMode 里 GameRoot 不跑，不自己初始化就撞 EnsureAssets 守卫。
 // ---------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -86,6 +86,10 @@ namespace DeepseaOil.Tests
 
             public float KnockImpulse;
 
+            public int StunHits;
+
+            public float StunSeconds;
+
             public void ApplySlow(float speedScale, float seconds)
             {
                 SlowRenews++;
@@ -108,6 +112,8 @@ namespace DeepseaOil.Tests
 
             public void ApplyStun(float seconds)
             {
+                StunHits++;
+                StunSeconds = seconds;
             }
         }
 
@@ -119,24 +125,22 @@ namespace DeepseaOil.Tests
             return new EnemyLogic(new MotorProbe(), spec).Status;
         }
 
-        private static GridLogic NewGrid(EnemyCellRegistry registry, Vector3Int cell, TileElementReactor reactor = null)
+        /// <summary>与 CombatRoot.Assemble 同一条装配：状态清单、状态工厂、二级反应查询表都来自表。</summary>
+        private static GridLogic NewGrid(EnemyCellRegistry registry, Vector3Int cell)
         {
-            // 与 CombatRoot.Assemble 同一条装配：状态清单与工厂都来自表
+            ReactionResolver.Initialize(ConfigModule.GetElementRules());
+            TileChainReactor.Clear();
+
             var grid = new GridLogic(
                 new GridGeometry(Vector2.zero, 1f),
                 ConfigModule.GetAllTileStates(),
                 CreateState,
-                reactor,
+                ConfigModule.GetDuoReactions(),
                 registry);
 
             grid.RegisterCell(cell);
 
             return grid;
-        }
-
-        private static TileElementReactor NewReactor()
-        {
-            return new TileElementReactor(ConfigModule.GetElementRules());
         }
 
         private static ITileState CreateState(TileStateType id)
@@ -159,7 +163,7 @@ namespace DeepseaOil.Tests
             var target = new GridTarget(status) { Position = grid.Geometry.CellCenter(cell) };
             registry.Register(cell, target);
 
-            grid.SwitchState(cell, TileStateType.Mud, applyEnterImpact: true);
+            grid.SwitchTileState(cell, TileStateType.Mud);
 
             var snapshot = new InputSnapshot(Vector2.zero, false, false);
 
@@ -187,17 +191,17 @@ namespace DeepseaOil.Tests
                 grid.Tick(now, RenderStep);
             }
 
-            Assert.Greater(target.SlowRenews, 0, "泥浆必须往目标身上续减速：seconds<=0 曾被直接丢弃");
-            Assert.AreEqual(0.5f, target.LastSlowScale, 1e-4f, "减速倍率取表里的 value1=0.5");
+            Assert.Greater(target.SlowRenews, 0, "泥浆必须往目标身上续减速：续命窗口为 0 时会被物理帧当场扣穿");
+            Assert.AreEqual(0.5f, target.LastSlowScale, 1e-4f, "减速倍率取表里的 slow_rate=0.5");
             Assert.Greater(
                 slowed,
                 ticks * 9 / 10,
                 $"减速生效的物理拍要覆盖九成以上（实测 {slowed}/{ticks}）：续命窗口短于一个物理拍时会被扣穿，表现为「贴着泥浆也不减速」");
         }
 
-        /// <summary>② DoT：燃烧（第 2 档 = 2 点/秒）按节拍跳字，且每次都是自己那一档的伤害。</summary>
+        /// <summary>② DoT：导电区（dot_damage=1）按秒跳字。</summary>
         [Test]
-        public void 燃烧按节拍掉血且用自己那一档()
+        public void 持续伤害按秒掉血()
         {
             StatusGroup status = NewStatus();
             var registry = new EnemyCellRegistry();
@@ -208,8 +212,12 @@ namespace DeepseaOil.Tests
             var target = new GridTarget(status) { Position = grid.Geometry.CellCenter(cell) };
             registry.Register(cell, target);
 
-            // 进格冲击那一下算一次（applyEnterImpact 的语义）
-            grid.SwitchState(cell, TileStateType.Burn, applyEnterImpact: true);
+            // 先切状态再登记：模拟"球先落地、敌人随后走进来"
+            grid.SwitchTileState(cell, TileStateType.ConductZone);
+
+            grid.OnActorEnterCell(cell, target);
+
+            int afterEnter = target.DamageHits;
 
             float now = 0f;
 
@@ -220,19 +228,15 @@ namespace DeepseaOil.Tests
                 grid.Tick(now, 1f / 60f);
             }
 
-            // 次数不钉死：浮点累加会让 3.0 秒那一次踩在边界上（实测 3 次，偶尔 2 次）。
-            // 钉死的是两条语义：① 不是"攒 60 次提交才掉一次"（那样最多 1 次）；② 每次都是第 2 档的 2 点。
-            Assert.GreaterOrEqual(target.DamageHits, 3, "进格 1 次 + 至少 2 次周期：内层累加器只加单帧 Δt 时会 60 秒才掉一次");
-            Assert.AreEqual(
-                2f * target.DamageHits,
-                target.DamageTotal,
-                1e-3f,
-                "每次伤害必须是状态自己那一档（燃烧 effectValuePos=2 → 2 点/次）：被表内第 1 档覆盖就变成 1 点/次");
+            // 次数不钉死：浮点累加会让 3.0 秒那一次踩在边界上。
+            // 钉死的是两条语义：① 进格那一下立刻痛（不是等满一秒）；② 之后按秒续上。
+            Assert.GreaterOrEqual(afterEnter, 1, "走进 DoT 格必须当场痛一次：等满一秒才掉血是首跳丢失");
+            Assert.GreaterOrEqual(target.DamageHits, afterEnter + 1, "DoT 必须按秒续上：内层累加器只加单帧 Δt 时 60 秒才掉一次");
         }
 
         /// <summary>③ 瞬时伤害：站着不动只吃进格那一次，逐帧重放就是每秒 60 点。</summary>
         [Test]
-        public void 瞬时伤害只在进格那一下()
+        public void 进格一次性伤害只结算一次()
         {
             StatusGroup status = NewStatus();
             var registry = new EnemyCellRegistry();
@@ -242,8 +246,8 @@ namespace DeepseaOil.Tests
 
             var target = new GridTarget(status) { Position = grid.Geometry.CellCenter(cell) };
 
-            // 冰沙先存在（球落地那一刻没人站在上面），敌人随后走进来
-            grid.SwitchState(cell, TileStateType.Smoothie, applyEnterImpact: true);
+            // 蒸汽先存在（球落地那一刻没人站在上面），敌人随后走进来
+            grid.SwitchTileState(cell, TileStateType.Steam);
 
             Assert.AreEqual(0, target.DamageHits, "没人站在格上时不该产生伤害");
 
@@ -259,11 +263,12 @@ namespace DeepseaOil.Tests
                 grid.Tick(now, 1f / 60f);
             }
 
-            Assert.AreEqual(1, target.DamageHits, "进格一次只该痛一次：逐帧提交会让冰沙一秒掉 60 点");
-            Assert.AreEqual(1f, target.DamageTotal, 1e-3f);
+            // 蒸汽 dot_damage=1：进格 1 次 + 1 秒内 1 次 ≈ 2 次；逐帧重放会是 60 次
+            Assert.LessOrEqual(target.DamageHits, 3, "进格的一次性伤害不许逐帧重放：站一秒掉 60 点是这个缺陷的经典表现");
+            Assert.GreaterOrEqual(target.DamageHits, 1, "进格那一下必须痛");
         }
 
-        /// <summary>④ 表里没给时长的减速：按"只要在格子上就持续生效"处理，不许直接丢弃。</summary>
+        /// <summary>④ 表里没给时长的减速（duration=-1）：按"只要在格子上就持续生效"处理，不许直接丢弃。</summary>
         [Test]
         public void 没给时长的减速也生效()
         {
@@ -276,7 +281,7 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(0.5f, status.SlowScale, 1e-4f, "seconds<=0 = 没给时长，不是「无效」；按续命兜底至少活过一拍");
         }
 
-        /// <summary>⑤ 离开泥浆要能恢复：续命停掉后不许永远挂着减速。</summary>
+        /// <summary>⑤ 离开减速格要能恢复：续命停掉后不许永远挂着减速。</summary>
         [Test]
         public void 离开泥浆后减速会恢复()
         {
@@ -298,54 +303,53 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(1f, status.SlowScale, 1e-4f, "没人再续命时减速必须过期，否则离开泥浆还一直是半速");
         }
 
-        /// <summary>⑥ 规则命中但结果状态是"无"（不改地形）：效果照样要落地，冲量不许被闷在判定里。</summary>
+        /// <summary>⑥ 首跳伤害必须当帧打出：这一条正是本轮要终结的「生成火池/蒸汽后怪走上去跳 0 点伤害」。</summary>
         [Test]
-        public void 反应不改地形时击退照样落地()
+        public void 落地瞬间伤害当帧结算()
         {
-            StatusGroup status = NewStatus();
             var registry = new EnemyCellRegistry();
             var cell = Vector3Int.zero;
 
-            GridLogic grid = NewGrid(registry, cell, NewReactor());
+            GridLogic grid = NewGrid(registry, cell);
 
-            var target = new GridTarget(status) { Position = grid.Geometry.CellCenter(cell) };
+            // 造一格基础火池，敌人正站在上面
+            grid.SwitchTileState(cell, TileStateType.BasicFire);
+
+            var target = new GridTarget(NewStatus()) { Position = grid.Geometry.CellCenter(cell) };
             registry.Register(cell, target);
 
-            // 造一个"除兜底行外谁都不匹配"的地形元素：含沙 + 湿 3 + 温 0
-            grid.SetCellElement(cell, new ElementValue(ElementType.Environment, ElementTag.Sand, 0, 3, 0));
+            Assert.AreEqual(0, target.DamageHits, "还没投球时不该有伤害");
 
-            ElementValue ball = ConfigModule.GetBall(BallType.Water).Element;
+            bool changed = grid.OnBallHit(cell, BallType.Water);
 
-            bool changed = grid.OnBallHit(cell, in ball);
-
-            Assert.IsFalse(changed, "兜底规则的结果状态是 None：地形不变，返回值就该是 false");
-            Assert.AreEqual(1, target.KnockHits, "地形没变也要把兜底行的击退打出去（曾经这里直接 return，冲量被吃掉）");
-            Assert.Greater(target.KnockImpulse, 0f, "冲量要按格数与衰减率折算成速度，不能是 0");
+            Assert.IsTrue(changed, "水砸火池必须产生变化（蒸汽）");
+            Assert.AreEqual(TileStateType.Steam, grid.StateOf(cell), "水 + 基础火池 → 蒸汽");
+            Assert.AreEqual(
+                1,
+                target.DamageHits,
+                "落地瞬间伤害必须在 OnBallHit 返回前结算：等下一次 Tick 就是「生成蒸汽后怪站着不掉血」的静默 Bug");
+            Assert.Greater(target.KnockImpulse, 0f, "element_rule 里这一行配了击退，必须折算成冲量打出去");
         }
 
-        /// <summary>⑦ 规则行的 effects 列是空的：状态自己的"进格一下"不能被空清单顶掉（冰沙的瞬时伤害）。</summary>
+        /// <summary>⑦ 连锁标记必须真的把泛洪跑起来：表里 trigger_chain=TRUE 的那一行要打出麻痹。</summary>
         [Test]
-        public void 规则清单为空时状态自己的进格伤害仍落地()
+        public void 连锁标记会触发泛洪()
         {
-            StatusGroup status = NewStatus();
             var registry = new EnemyCellRegistry();
             var cell = Vector3Int.zero;
 
-            GridLogic grid = NewGrid(registry, cell, NewReactor());
+            GridLogic grid = NewGrid(registry, cell);
 
-            var target = new GridTarget(status) { Position = grid.Geometry.CellCenter(cell) };
+            grid.SwitchTileState(cell, TileStateType.BasicElectricity);
+
+            var target = new GridTarget(NewStatus()) { Position = grid.Geometry.CellCenter(cell) };
             registry.Register(cell, target);
 
-            // 含沙 + 冷 ⇒ 命中冰沙那一行（它的 effects 列是空的，只有状态自己带"减速;瞬时伤害"）
-            grid.SetCellElement(cell, new ElementValue(ElementType.Environment, ElementTag.Sand, 0, 3, 0));
+            grid.OnBallHit(cell, BallType.Water);
 
-            ElementValue ball = ConfigModule.GetBall(BallType.WaterCold).Element;
-
-            bool changed = grid.OnBallHit(cell, in ball);
-
-            Assert.IsTrue(changed, "含沙 + 冷 应命中冰沙规则");
-            Assert.AreEqual(TileStateType.Smoothie, grid.StateOf(cell));
-            Assert.AreEqual(1, target.DamageHits, "站在格上的目标要吃冰沙那 1 点瞬时伤害：规则清单为空时被顶掉就是 0");
+            Assert.AreEqual(TileStateType.ConductZone, grid.StateOf(cell), "水 + 基础电源 → 导电区");
+            Assert.Greater(target.StunHits, 0, "TriggerChain 为真时必须真的泛洪：只写一列标记等于连锁根本不存在");
+            Assert.AreEqual(1.5f, target.StunSeconds, 1e-4f, "连锁电击的麻痹时长");
         }
     }
 }

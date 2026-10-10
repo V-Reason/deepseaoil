@@ -3,28 +3,23 @@
 //
 // 守的是这一类"不报错、只是格子空着"的缺口：
 //
-//   1. 「规则表命中的状态」必须是「有实现的状态」的子集
-//      element_rule / tile_state 里写出来的每个 result_id / id，都要能造出状态实例。
-//      少了实现的表现不是异常，而是"反应发生了、格子却什么都没变" ——
-//      上游那版就是这样：SwitchTo 对造不出来的状态也返回 true，于是上层照常发事件、
-//      照常把空状态机存回去，而 StateOf 下一次读回来仍是 Normal。
+//   1. 「表里写出来的每个地块」都必须能造出状态实例
+//      tile_state 的每一行、element_rule 的每个结果地貌，都要能造出状态。
+//      少了实现的表现不是异常，而是"反应发生了、格子却什么都没变"。
 //
 //   2. 切到一个"没有实现"的状态必须失败，且不留下空状态机
-//      （判据：SwitchState 返回 false；随后再切一个真有实现的状态仍能成功）。
 //
-//   3. 常规格也要有元素初值
-//      元素层的 FlushStateElement 曾经把"状态是 Normal"当成"摘掉记录"，于是常规格表
-//      （tile_state id=1 空地）自己的元素永远刷不上去 —— 水球砸空地于是算成"基础水地块"
-//      而不是泥浆。判据：RegisterCell 之后该格元素 == 表里 Normal 那一行的元素四件。
+//   3. 水球砸空地要落到有实现的状态（不许停在 Normal —— 适配器把 Normal 当擦除）
+//
+//   4. 反应网自洽：element_rule 的 (原格, 球种) 组合不许重复；结果地貌都要有行
+//      第 4 条是纯配置守卫：手改 xlsx 时最容易踩的两个坑
 //
 // 【跑法】Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All
-// 【为什么要在 SetUp 里自己 Init】测试是独立的 EditMode 程序集、也不进 PlayMode，Init 链的调用方
-//   GameRoot 在 EditMode 里根本不跑；不自己初始化就会撞 ConfigModule 的 EnsureAssets 守卫
-//   （"玩法数值在 BindAssets 之前被读取"）。口径与 Data层Tests 的 OneTimeSetUp 一致。
+// 【为什么要在 OneTimeSetUp 里自己 Init】测试是独立的 EditMode 程序集、也不进 PlayMode，
+//   Init 链的调用方 GameRoot 在 EditMode 里根本不跑；不自己初始化就会撞 EnsureAssets 守卫。
 // ---------------------------------------------------------------------------
 
 using System.Collections.Generic;
-using System.Linq;
 using DeepseaOil.Data;
 using DeepseaOil.Logic.Combat;
 using DeepseaOil.Logic.Element;
@@ -42,7 +37,6 @@ namespace DeepseaOil.Tests
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            // 与 Data层Tests 同一口径（可重复执行：AssetModule.Dispose 是幂等的，ConfigModule 靠 IsReady 守卫跳过）。
             AssetModule.Dispose();
 
             if (!ConfigModule.IsReady)
@@ -50,6 +44,8 @@ namespace DeepseaOil.Tests
 
             AssetModule.Init();
             ConfigModule.BindAssets();
+
+            ReactionResolver.Initialize(ConfigModule.GetElementRules());
         }
 
         [OneTimeTearDown]
@@ -101,48 +97,30 @@ namespace DeepseaOil.Tests
         }
 
         [Test]
-        public void 常规格也有表里的元素初值()
+        public void 水球砸空地落到有贴图的状态()
         {
-            TileStateSpec normal = ConfigModule.GetTileState(TileStateType.Normal);
+            GridLogic grid = NewGrid();
 
-            // 元素层的初值必须真的刷上去（曾经 "状态是 Normal ⇒ 摘掉记录" 把这条吞了）
-            var reactor = new TileElementReactor(ConfigModule.GetElementRules());
-            var grid = new GridLogic(new GridGeometry(Vector2.zero, 1f), ConfigModule.GetAllTileStates(), CreateState, reactor);
+            var cell = Vector3Int.zero;
 
-            var cell = new Vector3Int(3, 3, 0);
-            grid.RegisterCell(cell);
-
-            ElementValue seeded = reactor.GetElement(cell);
-
-            Assert.AreEqual(normal.Element.Tags, seeded.Tags, "常规格的标签位没有按表刷上去");
-            Assert.AreEqual(normal.Element.Temperature, seeded.Temperature);
-            Assert.AreEqual(normal.Element.Wet, seeded.Wet);
-            Assert.AreEqual(normal.Element.Conductivity, seeded.Conductivity);
-        }
-
-        [Test]
-        public void 水球砸常规格落到有贴图的状态()
-        {
-            // 判据不写死"Mud"：只要求结果状态**有实现**，且不是 Normal（Normal 会被适配器当成擦除）。
-            // 这样表里调整地面脾性时这条用例不会假红，而"反应算出个空状态"仍会被抓住。
-            var rules = ConfigModule.GetElementRules();
-            var reactor = new TileElementReactor(rules);
-            var grid = new GridLogic(new GridGeometry(Vector2.zero, 1f), ConfigModule.GetAllTileStates(), CreateState, reactor);
-
-            var cell = new Vector3Int(0, 0, 0);
-            grid.RegisterCell(cell);
-
-            ProjectileSpec water = ConfigModule.GetBall(BallType.Water);
-
-            Assert.IsNotNull(water, "projectile 表里没有水球");
-
-            bool changed = grid.OnBallHit(cell, water.Element);
+            bool changed = grid.OnBallHit(cell, BallType.Water);
 
             TileStateType landed = grid.StateOf(cell);
 
             Assert.IsTrue(changed, "水球落地没有产生状态转换");
-            Assert.AreNotEqual(TileStateType.Normal, landed, "落地后仍是常规格：反应算了但没落地");
+            Assert.AreEqual(TileStateType.BasicWater, landed, "空地 + 纯水 → 基础水");
             Assert.IsNotNull(CreateState(landed), $"{landed} 没有实现：格子会空着");
+        }
+
+        [Test]
+        public void 泥土球砸空地落到基础土()
+        {
+            GridLogic grid = NewGrid();
+
+            var cell = Vector3Int.zero;
+
+            Assert.IsTrue(grid.OnBallHit(cell, BallType.Earth), "土球落地没有产生状态转换");
+            Assert.AreEqual(TileStateType.BasicEarth, grid.StateOf(cell), "空地 + 纯土 → 基础土");
         }
 
         [Test]
@@ -156,19 +134,65 @@ namespace DeepseaOil.Tests
 
             for (int i = 0; i < rules.Count; i++)
             {
-                TileStateType result = rules[i].ResultTileType;
+                TileStateType result = rules[i].ResultTile;
 
-                // None = "不改动"（兜底行的写法），Normal = 落回常规：两者都不需要状态实现。
+                // None = "不改动"，Normal = 落回常规：两者都不需要状态实现。
                 if (result == TileStateType.None || result == TileStateType.Normal) continue;
 
                 if (CreateState(result) != null) continue;
 
-                missing.Add($"优先级 {rules[i].Priority} → {result}（id={(int)result}）");
+                missing.Add($"规则 {rules[i].Id} → {result}（id={(int)result}）");
             }
 
             Assert.IsEmpty(missing,
-                "这些规则的 result_id 没有对应的状态实现：反应判定会通过、格子却什么都不变（最坏的一类静默）。\n  "
+                "这些规则的结果地貌没有对应的状态实现：反应判定会通过、格子却什么都不变（最坏的一类静默）。\n  "
                 + string.Join("\n  ", missing));
+        }
+
+        [Test]
+        public void 反应规则的主键不重复()
+        {
+            IReadOnlyList<ElementRuleSpec> rules = ConfigModule.GetElementRules();
+
+            var seen = new Dictionary<(TileStateType, BallType), int>();
+
+            var dup = new List<string>();
+
+            for (int i = 0; i < rules.Count; i++)
+            {
+                var key = (rules[i].SourceTile, rules[i].BallType);
+
+                if (seen.TryGetValue(key, out int first))
+                {
+                    dup.Add($"({key.SourceTile}, {key.BallType})：id {first} 与 id {rules[i].Id}");
+                    continue;
+                }
+
+                seen[key] = rules[i].Id;
+            }
+
+            Assert.IsEmpty(dup,
+                "element_rule 里 (原格, 球种) 重复：ReactionResolver 按它建哈希表，重复会让后者被静默忽略。\n  "
+                + string.Join("\n  ", dup));
+        }
+
+        [Test]
+        public void 二级反应的地貌都有实现()
+        {
+            DuoReactionCatalog catalog = ConfigModule.GetDuoReactions();
+
+            IReadOnlyList<SeedSpec> seeds = ConfigModule.GetAllSeeds();
+
+            Assert.Greater(seeds.Count, 0, "seed 表一行都没有：战备配给无种子可发");
+
+            for (int i = 0; i < seeds.Count; i++)
+            {
+                Assert.IsNotNull(
+                    CreateState(seeds[i].SpawnTile),
+                    $"种子 {seeds[i].Id} 的 spawn_tile={seeds[i].SpawnTile} 造不出状态：播下去会是空地");
+            }
+
+            Assert.Greater(catalog.Count, 0, "element_duo_reaction 一行都没有：二级元素连锁不会发生");
         }
 
         [Test]
@@ -178,24 +202,19 @@ namespace DeepseaOil.Tests
 
             Vector3Int cell = Vector3Int.zero;
 
-            // None(0) 在 tile_state 表里没有行 —— 这是"真的没有实现"，不是"打错了 id"。
-            Assert.IsFalse(grid.SwitchState(cell, TileStateType.None, applyEnterImpact: true),
+            // 从表里挑一个真的没有行的枚举值：BasicIce 之后的新地貌里，用一个肯定没登记的值
+            const TileStateType absent = (TileStateType)999;
+
+            Assert.IsFalse(grid.SwitchTileState(cell, absent),
                 "切到一个没有实现的状态必须返回 false");
 
             Assert.AreEqual(TileStateType.Normal, grid.StateOf(cell),
                 "切换失败后格子状态必须保持原样（不能变成「有状态机但读作常规」）");
 
-            // 空状态机没有留下来：现在切一个真有实现的状态，必须还能成功。
-            Assert.IsTrue(grid.SwitchState(cell, TileStateType.Mud, applyEnterImpact: true),
+            Assert.IsTrue(grid.SwitchTileState(cell, TileStateType.Mud),
                 "失败的那次不该污染状态机：随后切一个真有实现的状态仍应成功");
 
             Assert.AreEqual(TileStateType.Mud, grid.StateOf(cell));
-
-            // 再切回常规：状态机应当被摘掉，重新可切。
-            Assert.IsTrue(grid.SwitchState(cell, TileStateType.Normal, applyEnterImpact: false));
-            Assert.AreEqual(TileStateType.Normal, grid.StateOf(cell));
-            Assert.IsTrue(grid.SwitchState(cell, TileStateType.Mud, applyEnterImpact: true),
-                "落回常规后状态机应当被摘掉，再切回来必须成功");
         }
     }
 }

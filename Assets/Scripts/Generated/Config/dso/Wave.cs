@@ -22,11 +22,13 @@ public sealed partial class Wave : Luban.BeanBase
     {
         { if(!_buf["id"].IsNumber) { throw new SerializationException(); }  Id = _buf["id"]; }
         { if(!_buf["name"].IsString) { throw new SerializationException(); }  Name = _buf["name"]; }
+        { if(!_buf["prep_time"].IsNumber) { throw new SerializationException(); }  PrepTime = _buf["prep_time"]; }
+        { if(!_buf["battle_time"].IsNumber) { throw new SerializationException(); }  BattleTime = _buf["battle_time"]; }
+        { if(!_buf["settle_time"].IsNumber) { throw new SerializationException(); }  SettleTime = _buf["settle_time"]; }
         { if(!_buf["enemies_per_wave"].IsNumber) { throw new SerializationException(); }  EnemiesPerWave = _buf["enemies_per_wave"]; }
         { if(!_buf["spawn_interval"].IsNumber) { throw new SerializationException(); }  SpawnInterval = _buf["spawn_interval"]; }
-        { if(!_buf["initial_delay"].IsNumber) { throw new SerializationException(); }  InitialDelay = _buf["initial_delay"]; }
-        { if(!_buf["respawn_delay"].IsNumber) { throw new SerializationException(); }  RespawnDelay = _buf["respawn_delay"]; }
         { if(!_buf["spawn_radius"].IsNumber) { throw new SerializationException(); }  SpawnRadius = _buf["spawn_radius"]; }
+        { if(!_buf["grant_seed"].IsNumber) { throw new SerializationException(); }  GrantSeed = (dso.SeedType)_buf["grant_seed"].AsInt; }
     }
 
     public static Wave DeserializeWave(JSONNode _buf)
@@ -35,7 +37,7 @@ public sealed partial class Wave : Luban.BeanBase
     }
 
     /// <summary>
-    /// 编号
+    /// 波次
     /// </summary>
     public readonly int Id;
     /// <summary>
@@ -43,25 +45,33 @@ public sealed partial class Wave : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 每波敌人数
+    /// 备战时长
+    /// </summary>
+    public readonly float PrepTime;
+    /// <summary>
+    /// 战斗时长
+    /// </summary>
+    public readonly float BattleTime;
+    /// <summary>
+    /// 结算时长
+    /// </summary>
+    public readonly float SettleTime;
+    /// <summary>
+    /// 敌人数
     /// </summary>
     public readonly int EnemiesPerWave;
     /// <summary>
-    /// 同波内两只之间的间隔
+    /// 刷怪间隔
     /// </summary>
     public readonly float SpawnInterval;
-    /// <summary>
-    /// 开局到第一波的等待
-    /// </summary>
-    public readonly float InitialDelay;
-    /// <summary>
-    /// 清完一波到下一波的等待
-    /// </summary>
-    public readonly float RespawnDelay;
     /// <summary>
     /// 出生环半径
     /// </summary>
     public readonly float SpawnRadius;
+    /// <summary>
+    /// 战备配给种子
+    /// </summary>
+    public readonly dso.SeedType GrantSeed;
    
     public const int __ID__ = 394089095;
     public override int GetTypeId() => __ID__;
@@ -75,11 +85,13 @@ public sealed partial class Wave : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "name:" + Name + ","
+        + "prepTime:" + PrepTime + ","
+        + "battleTime:" + BattleTime + ","
+        + "settleTime:" + SettleTime + ","
         + "enemiesPerWave:" + EnemiesPerWave + ","
         + "spawnInterval:" + SpawnInterval + ","
-        + "initialDelay:" + InitialDelay + ","
-        + "respawnDelay:" + RespawnDelay + ","
         + "spawnRadius:" + SpawnRadius + ","
+        + "grantSeed:" + GrantSeed + ","
         + "}";
     }
 }

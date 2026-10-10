@@ -1,11 +1,35 @@
 [
   {
     "id": 1,
-    "name": "默认波次",
-    "enemies_per_wave": 4,
+    "name": "首波侵袭",
+    "prep_time": 10,
+    "battle_time": 30,
+    "settle_time": 8,
+    "enemies_per_wave": 6,
+    "spawn_interval": 0.4,
+    "spawn_radius": 5,
+    "grant_seed": 1
+  },
+  {
+    "id": 2,
+    "name": "疾跑蜂拥",
+    "prep_time": 10,
+    "battle_time": 30,
+    "settle_time": 8,
+    "enemies_per_wave": 10,
+    "spawn_interval": 0.3,
+    "spawn_radius": 5,
+    "grant_seed": 2
+  },
+  {
+    "id": 3,
+    "name": "精英试炼",
+    "prep_time": 10,
+    "battle_time": 30,
+    "settle_time": 8,
+    "enemies_per_wave": 12,
     "spawn_interval": 0.25,
-    "initial_delay": 1.5,
-    "respawn_delay": 2.5,
-    "spawn_radius": 5
+    "spawn_radius": 5,
+    "grant_seed": 3
   }
 ]

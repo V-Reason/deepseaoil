@@ -43,7 +43,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -95,7 +95,112 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: tileset_wasteland_binshahuijin_1
+      rect:
+        serializedVersion: 2
+        x: 1408
+        y: 568
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 31475a1aae3271b49b54619813de1ed4
+      internalID: 2047614193
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: tileset_wasteland_binshahuijin_2
+      rect:
+        serializedVersion: 2
+        x: 1152
+        y: 440
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0c5d53cf3f5bba74a8e6cf5871d944d6
+      internalID: 237593198
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: tileset_wasteland_binshahuijin_8
+      rect:
+        serializedVersion: 2
+        x: 1408
+        y: 312
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 38dcb6018bc929f439c4a3bc9af2f4b2
+      internalID: 1230051974
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: tileset_wasteland_binshahuijin_12
+      rect:
+        serializedVersion: 2
+        x: 1152
+        y: 184
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 05b1eb4d915f5534aa458a266e03eb24
+      internalID: 1903455925
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: tileset_wasteland_binshahuijin_16
+      rect:
+        serializedVersion: 2
+        x: 1408
+        y: 56
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 482a204d266adcb4cbf0a40e07c31b27
+      internalID: -671836278
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -106,7 +211,24 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      tileset_wasteland_binshahuijin_0: -1833127710
+      tileset_wasteland_binshahuijin_1: 2047614193
+      tileset_wasteland_binshahuijin_10: -1333228365
+      tileset_wasteland_binshahuijin_11: -1059943025
+      tileset_wasteland_binshahuijin_12: 1903455925
+      tileset_wasteland_binshahuijin_13: 73516774
+      tileset_wasteland_binshahuijin_14: 1574685562
+      tileset_wasteland_binshahuijin_15: 291181189
+      tileset_wasteland_binshahuijin_16: -671836278
+      tileset_wasteland_binshahuijin_2: 237593198
+      tileset_wasteland_binshahuijin_3: 228501857
+      tileset_wasteland_binshahuijin_4: -315649351
+      tileset_wasteland_binshahuijin_5: -902158780
+      tileset_wasteland_binshahuijin_6: -26780342
+      tileset_wasteland_binshahuijin_7: -1967163867
+      tileset_wasteland_binshahuijin_8: 1230051974
+      tileset_wasteland_binshahuijin_9: -1805924562
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

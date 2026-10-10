@@ -32,7 +32,7 @@ public partial class TbElementRule
             dso.ElementRule _v;
             { if(!_ele.IsObject) { throw new SerializationException(); }  _v = global::cfg.dso.ElementRule.DeserializeElementRule(_ele);  }
             _dataList.Add(_v);
-            _dataMap.Add(_v.Priority, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 

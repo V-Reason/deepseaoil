@@ -1,0 +1,68 @@
+[
+  {
+    "id": 1,
+    "elem_a": 16,
+    "elem_b": 19,
+    "result_tile": 21,
+    "impact_damage": 0,
+    "impact_knockback": 0,
+    "result_duration": 3,
+    "effect_radius": 1,
+    "trigger_chain": true
+  },
+  {
+    "id": 2,
+    "elem_a": 16,
+    "elem_b": 18,
+    "result_tile": 8,
+    "impact_damage": 4,
+    "impact_knockback": 4,
+    "result_duration": 2,
+    "effect_radius": 1.5,
+    "trigger_chain": true
+  },
+  {
+    "id": 3,
+    "elem_a": 17,
+    "elem_b": 18,
+    "result_tile": 5,
+    "impact_damage": 0,
+    "impact_knockback": 0,
+    "result_duration": 4,
+    "effect_radius": 2.5,
+    "trigger_chain": true
+  },
+  {
+    "id": 4,
+    "elem_a": 18,
+    "elem_b": 19,
+    "result_tile": 22,
+    "impact_damage": 1,
+    "impact_knockback": 0,
+    "result_duration": 3,
+    "effect_radius": 1,
+    "trigger_chain": true
+  },
+  {
+    "id": 5,
+    "elem_a": 17,
+    "elem_b": 16,
+    "result_tile": 1,
+    "impact_damage": 0,
+    "impact_knockback": 0,
+    "result_duration": 6,
+    "effect_radius": 2.5,
+    "trigger_chain": false
+  },
+  {
+    "id": 6,
+    "elem_a": 17,
+    "elem_b": 19,
+    "result_tile": 23,
+    "impact_damage": 1,
+    "impact_knockback": 0,
+    "result_duration": 3,
+    "effect_radius": 1,
+    "trigger_chain": false
+  }
+]
