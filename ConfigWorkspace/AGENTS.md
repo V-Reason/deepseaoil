@@ -19,7 +19,7 @@
   - `__tables__.xlsx` 的 `output` 列决定生成 JSON 的文件名（`dso.TbEnemy` → `dso_tbenemy`）；留空默认 `<模块>_<表名>`
   - 🔴 **`Data/*.xlsx` 是唯一配置真源，人工在 Excel 里维护**：枚举列统一填中文**别名**（`基础火池` / `纯水` / `火种子`），这些列已挂数据验证下拉框。
   - 🔴 **严禁编写或运行任何覆盖源表的生成脚本**：那会静默重写整张表，抹掉人工填的别名与下拉框。
-  - 手改 xlsx 的两条实测坑：**不要用 openpyxl 重建工作表**（第 1-3 行有嵌套子表头，重建后报「缺失列:'alias'」），改单元格走「读入 → 改 → 存回」；`full_name` **只在块首行有值**。详见 `Docs/表格数据配置/技术文档_配表管线.md` 第 2 节。
+  - 手改 xlsx 的两条实测坑：**不要用 openpyxl 重建工作表**（第 1-3 行有嵌套子表头，重建后报「缺失列:'alias'」），改单元格走「读入 → 改 → 存回」；`full_name` **只在块首行有值**。详见 `Docs/配表/技术文档_配表管线.md` 第 2 节。
   - `Data/` 下**只有 xlsx**，没有 `.txt` / `.md` 手记快照（旧快照已删，它们与 schema 脱节会误导改表的人）
 - `Tools/Luban/`：Luban 工具本体（走 Git LFS）
 - `output/`：中间产物（gitignore）。**Luban 先写这里，成功后才镜像拷贝进 Assets**
@@ -55,8 +55,8 @@ dotnet Tools/Luban/Luban.dll --conf luban.conf -t client --strict \
 
 ## 相关文档
 
-- `Docs/表格数据配置/技术文档_配表管线.md`：契约、参数、纪律、排障（面向程序）
-- `Docs/表格数据配置/策划手册_数据表填写.md`：单元格层面的动作与报错对照（面向策划）
+- `Docs/配表/技术文档_配表管线.md`：契约、参数、纪律、排障（面向程序）
+- `Docs/配表/策划手册_数据表填写.md`：单元格层面的动作与报错对照（面向策划）
 
 ## 🔴 不要去装 Luban 的 UPM 包
 
@@ -66,4 +66,4 @@ Luban 运行库已有一份**进 git 的本地拷贝** `Assets/Luban.Runtime/`�
 两个来源的 asmdef 都叫 `Luban.Runtime`，撞名后报
 `Assembly with name 'Luban.Runtime' already exists`，
 并导致**整个工程所有程序集都编译不出来**。这是有意的本地拷贝决策（避开 Jam 期间联网拉包），
-详见 `Docs/表格数据配置/技术文档_配表管线.md` 第 1 节。
+详见 `Docs/配表/技术文档_配表管线.md` 第 1 节。

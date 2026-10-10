@@ -1,5 +1,5 @@
 {
-  "note": "注释预算表：每个文件的注释有效字符上限。只降不升；上调必须走 PR 说明 + -Mode seal。口径见 Docs/注释规范.md。覆盖面：Assets/Scripts/** 与 Assets/Tests/**；测试文件按文件单独登记（测试的注释/代码比天然高于实现文件，不吃 densityCap）。",
+  "note": "注释预算表：每个文件的注释有效字符上限。只降不升；上调必须走 PR 说明 + -Mode seal。口径见 Docs/工程/注释规范.md。覆盖面：Assets/Scripts/** 与 Assets/Tests/**；测试文件按文件单独登记（测试的注释/代码比天然高于实现文件，不吃 densityCap）。",
   "sealedAt": "0503003",
   "sealedOn": "2026-10-10",
   "densityCap": 5.37,

@@ -1,13 +1,14 @@
 ---
 
-> 🔴 **2026-10 更新：本文件第 1、4、6 节的字段清单已被「战斗与元素反应重构」取代。**
+> 🔴 **2026-10 更新：本文件第二节与第三节的字段清单已被「战斗与元素反应重构」取代。**
 > 温湿度电三轴、`tile_effect` 效果档位表、`TileEffectValue` 多槽位结构体**已物理删除**。
 > 现在各表的确切列与语义见：
-> - `Docs/策划案_荒原复苏指南_v4.0.md` 第 8 节（配置契约附录，含全部列名速查）
-> - `Docs/表格数据配置/技术文档_配表管线.md` 第 2 节（9 张表逐表消费者）
+> - `Docs/设计/策划案_荒原复苏指南_v4.0.md` 第 8 节（配置契约附录，含全部列名速查）
+> - `Docs/配表/技术文档_配表管线.md` 第 2 节（9 张表逐表消费者）
+> - `Docs/配表/策划配表手册.md`
 >
-> **下文保留的是"划界原则"（Excel 放什么 / SO 放什么 / 资产怎么寻址）与已经被执行的部分**，
-> 第四节「美术资源加载规约」仍然完全有效。
+> **下文保留的是"划界原则"（Excel 放什么 / SO 放什么 / 资产怎么寻址）**，
+> 第四节「美术资源加载规约」仍然完全有效，是本文档唯一没被取代的一节。
 
 ### 一、划分原则（第一性原则）
 
@@ -35,45 +36,42 @@
 #### 1. `projectile.xlsx`（投掷资源表）
 
 已完成：4 个抛物线字段已移出至 SO（`ThrowTuning.asset`）。
-**本轮进一步收缩**：元素三数值与标签位已删除，球种只剩两种。
+**本轮进一步收缩**：元素三数值与标签位已删除，球种只剩两种，**表里现在只有 `id` / `name` 两列**（`type` 列与 `dso.ElementType` / `dso.Quality` 枚举都不存在）。
 
 | 字段 | 类型 | 说明 |
 | :-- | :-- | :-- |
 | `id` | `BallType` | 球种枚举（**只剩 `Water` 纯水 / `Earth` 纯土**） |
 | `name` | `string!` | 显示名 |
-| `type` | `ElementType` | 大类标记（水 / 土）；只作语义标记，不参与落地判定 |
 
 > 落地结果由 `element_rule` 查表决定，球本身不再携带任何"地形倾向"。
 
 #### 2. `player.xlsx`（玩家配置表）
-- **当前痛点**：策划案 3.0 已锁定为“3 颗心，归零即死”。表里填 `100` 血、`10` 伤害已脱节；且 `knockback_impulse`, `knockback_speed_limit`, `contact_radius` 全是刚体物理参数。
-- **划界改动**：
-  - **移出至 SO (`PlayerConfig.asset`)**：`knockback_impulse`（击退冲量）、`knockback_speed_limit`（受击限速）、`contact_radius`（身体接触判定半径）、`retry_delay`（死亡复活等待）。
-  - **保留在 Excel**（建议仅留核心规则）：
-    | 字段                    | 类型     | 说明                               |
-    | :---------------------- | :------- | :--------------------------------- |
-    | `id`                    | `int`    | 编号（固定为 1）                   |
-    | `name`                  | `string` | 玩家标识                           |
-    | `max_hp`                | `float`  | 锁定为 **3**（策划案 3.0：3 颗心） |
-    | `invulnerable_duration` | `float`  | 受击无敌时长（秒，防连续暴毙）     |
-    | `attack_interval`       | `float`  | 投掷间隔/CD（秒）                  |
+- **落地状态**：策划案 3.0 锁定的“3 颗心，归零即死”已落表（`max_hp = 3`）。
+- **未落地**：`knockback_impulse`（击退冲量）、`knockback_speed_limit`（受击限速）、`contact_radius`（身体接触判定半径）、`retry_delay`（死亡复活等待）**仍在表里、且由表消费** —— 分别由 `CombatRoot`（冲量与重来延时）、`PlayerLogic`（限速）、`CombatRoot` → `ContactProbe`（接触半径）读取；`PlayerConfig.cs` 里没有这几个字段。表里另有一列 `contact_damage` 是**零消费者**（接触伤害的权威是敌人表的 `EnemySpec.ContactDamage`）。
+- **表里的核心理则列**（表实际还有上面那四列、`contact_damage` 以及水·土弹药上限/开局、神泉回血间隔；逐列消费者见 `Docs/配表/技术文档_配表管线.md` 第 2 节）：
+  | 字段                    | 类型     | 说明                               |
+  | :---------------------- | :------- | :--------------------------------- |
+  | `id`                    | `int`    | 编号（固定为 1）                   |
+  | `name`                  | `string` | 玩家标识                           |
+  | `max_hp`                | `float`  | 锁定为 **3**（策划案 3.0：3 颗心） |
+  | `invulnerable_duration` | `float`  | 受击无敌时长（秒，防连续暴毙）     |
+  | `attack_interval`       | `float`  | 投掷间隔/CD（秒）                  |
 
 #### 3. `enemy.xlsx`（敌人配置表）
-- **落地状态（2026-10-09，已完成）**：`radius` / `acceleration` / `knockback_decay` / `stop_distance` / `chase_range` 已移出表、进 `EnemyTuning`（`Assets/Resources/tuning/EnemyTuning.asset`，`ConfigModule.BindAssets` 取不到即抛 `ConfigLoadException`）；表里只剩 **`id` / `name` / `max_speed` / `hp`**。`flash_hz` 更早已归 `VisualPalette`，`stun_seconds` 已删列。
-- **尚未落地**：`contact_damage` 列还没加 —— 接触伤害目前仍由 `player.contact_damage` ＋ `player.contact_radius` 在 `CombatRoot.UpdatePlayerContact` 里结算；要按怪种区分伤害时才搬（见 `Docs/待办.md`）。
-- **当前痛点**：`flash_hz`（受击闪烁频率）是纯表现；`acceleration`、`knockback_decay` 是运动学控制律；`stun_seconds` 代码已废弃。
+- **落地状态（2026-10-09，已完成）**：`radius` / `acceleration` / `knockback_decay` / `stop_distance` / `chase_range` 已移出表、进 `EnemyTuning`（`Assets/Resources/tuning/EnemyTuning.asset`，`ConfigModule.BindAssets` 取不到即抛 `ConfigLoadException`）；`flash_hz` 更早已归 `VisualPalette`（字段名 `enemyFlashHz`），`stun_seconds` 已删列。表里现在是 **`id` / `name` / `max_speed` / `hp` / `contact_damage`** 五列。
+- **落地状态（已完成）**：`contact_damage` 列**已加且已生效**，类型 `int!#range=[0,999]`，两行分别是 1 / 2。接触伤害**不再由 `player` 表结算**：`ContactProbe` 经 `IContactDamager` 从敌人自己身上读 `EnemySpec.ContactDamage`；`player.contact_damage` 退化成零消费者。
 - **划界改动**：
   - **移出至 SO (`EnemyTuning.asset` & `VisualPalette.asset`)**：
-    - 移入 `VisualPalette`：`flash_hz`（闪烁频率）。
-    - 移入 `EnemyTuning`：`radius`（碰撞半径）、`acceleration`（加速度）、`knockback_decay`（受击滑停衰减）、`stop_distance`（停止逼近距离）、`chase_range`（脱战距离）。
+    - 移入 `VisualPalette`：`enemyFlashHz`（受击闪烁频率）。
+    - 移入 `EnemyTuning`：`radius`（碰撞半径）、`acceleration`（加速度）、`knockbackDecay`（受击滑停衰减）、`stopDistance`（停止逼近距离）、`chaseRange`（脱战距离）。
   - **保留在 Excel**（支持普通怪与精英怪两行）：
-    | 字段             | 类型     | 说明                                           |
-    | :--------------- | :------- | :--------------------------------------------- |
-    | `id`             | `int`    | 1=普通怪，2=精英怪                             |
-    | `name`           | `string` | 普通怪 / 精英怪                                |
-    | `hp`             | `int`    | 耐久（策划案 3.0：普通怪 **3**，精英怪 **6**） |
-    | `max_speed`      | `float`  | 追击极速（策划调追逐压迫感）                   |
-    | `contact_damage` | `float`  | 接触伤害（固定为 1）                           |
+    | 字段             | 类型              | 说明                                           |
+    | :--------------- | :---------------- | :--------------------------------------------- |
+    | `id`             | `int`             | 1=普通怪，2=精英怪                             |
+    | `name`           | `string`          | 普通怪 / 精英怪                                |
+    | `hp`             | `int`             | 耐久（策划案 3.0：普通怪 **3**，精英怪 **6**） |
+    | `max_speed`      | `float`           | 追击极速（策划调追逐压迫感）                   |
+    | `contact_damage` | `int!#range=[0,999]` | 接触伤害（普通怪 **1**，精英怪 **2**）      |
 
 #### 4. `tile_state.xlsx`（地块状态表）
 
@@ -88,7 +86,7 @@
 | `slow_rate` | `float` | 踩在上面的移速倍率（1 = 不减速） |
 | `dot_damage` | `int` | 每秒伤害（0 = 无伤害） |
 | `is_obstacle` | `bool` | 物理阻挡墙体 |
-| `is_conductor` | `bool` | **网格连锁导通体**（水·土·泥浆·稀泥为真） |
+| `is_conductor` | `bool` | **网格连锁导通体**（`基础水` / `基础土` / `普通泥浆` / `稀泥` / `导电区` 为真） |
 
 > **权责边界**：这张表只管"留在地上之后"。**落地那一下的冲击归 `element_rule`**，
 > 两张表不重叠、不互斥 —— 不再有"规则表有效果就顶掉地块表效果"的补丁逻辑。
@@ -107,8 +105,8 @@
 | `settle_time` | `float` | 结算时长（默认 8s）：**必须等残余敌人清空**才推进 |
 | `enemies_per_wave` | `int!` | 本波怪量 |
 | `spawn_interval` | `float!` | 刷怪间隔（秒），下限 0.05 |
-| `spawn_radius` | `float!` | 出生环半径 |
-| `grant_seed` | `SeedType` | **本波备战期配给的战备种子**（可留空 = 不发） |
+| `spawn_radius` | `float!#range=[0.5,50]` | 出生环半径 |
+| `grant_seed` | `SeedType` | **本波备战期配给的战备种子**（表里填 `Fire` / `Elec` / `Ice`；可留空 = 不发） |
 
 > 跑完全表后**循环回第一行**并继续递增波次号（无尽模式），没有"通关"终态。
 
@@ -127,12 +125,13 @@
 | `impact_damage` | `int` | **落地瞬间伤害，当帧结算** |
 | `impact_knockback` | `float` | 落地瞬间击退（格） |
 | `impact_stun` | `float` | 落地瞬间麻痹（秒） |
+| `impact_radius` | `float` | 落地瞬间的波及范围（格） |
 | `trigger_chain` | `bool` | 是否触发网格连锁泛洪 |
 
 > 🔴 **业务唯一键是 `(source_tile, ball_type)`**：`ReactionResolver` 按它建哈希表做 O(1) 查询，
-> 重复配置会被当场 `LogError` 报出（后者不算数）。`priority` 列**已删除** ——
+> 重复配置会被当场 `LogError` 报出（后者不算数）。曾经有过 `priority` 列，**已删除** ——
 > 它曾经叫"优先级"而实际匹配顺序由表内行序决定，是纯误导。
-> `impact_stun` **不要加 `!`**：它有 8 行天然是 0，加 `!` 会导表失败。
+> `impact_stun` **不要加 `!`**：11 行里有 **10 行**天然是 0，加 `!` 会导表失败。
 
 `element_duo_reaction.xlsx` — 地面 × 地面（新表）：
 
@@ -157,16 +156,17 @@
 
 ### 三、ScriptableObject 承接体系（程序调参盘）
 
-在 `Assets/Scripts/Data/Settings/` 下，程序持有以下 SO 文件（均在 `Resources/tuning/`）：
+在 `Assets/Scripts/Data/Settings/` 下，程序持有以下 SO 文件（**调参 SO 全部由 `ConfigModule.BindAssets` 装载，并经 `ConfigModule` 暴露给上层**；`PlayerConfig.asset` / `AudioConfig.asset` 在 `Resources/config/`，其余在 `Resources/tuning/`。`AudioConfig` 是例外：由 `AudioManager` 自己按 `Config/AudioConfig` 读取，不经 `ConfigModule`）：
 
-1. **`PlayerConfig.cs`**：
-   - 包含：移动速度 `moveSpeed`、8向吸附 `snapToEightDirections`、冲刺参数 `dash*`、受击物理反馈 `knockbackImpulse`、`knockbackSpeedLimit`、接触检测 `contactRadius`。
+1. **`PlayerConfig.cs`**（继承 `CharacterConfig`：`moveSpeed` / `snapToEightDirections` / `moveAcceleration` / `turnDecayRate` / `hurtDecay` / `extraForceScale` / `dashSpeed` / `dashDuration`）：
+   - 自身只有输入与冲刺三项：`inputBufferTime`、`dashCooldown`、`dashBufferTime`。
+   - **不含**：`knockback_impulse` / `knockback_speed_limit` / `contact_radius` / `retry_delay` 这四个字段仍在 `player` 表里由表消费。
 2. **`ThrowTuning.cs`**：
    - 包含：抛物线基准时长 `flightDuration`、弧高 `arcHeight`、投掷最大/小距离、瞄准环压扁比例与透视。
-3. **`EnemyTuning.cs`**（建议将敌人运动参数收口于此）：
-   - 包含：碰撞半径 `radius`、加速度 `moveAcceleration`、受击滑停衰减 `turnDecayRate`、停止逼近距离 `stopDistance`、脱战距离 `chaseRange`。
+3. **`EnemyTuning.cs`**：
+   - 包含：碰撞半径 `radius`、加速度 `acceleration`、受击滑停衰减 `knockbackDecay`、停止逼近距离 `stopDistance`、脱战距离 `chaseRange`。**资产缺失即抛 `ConfigLoadException`**（不退回默认值）。
 4. **`VisualPalette.cs`**：
-   - 包含：受击闪烁频率 `flashHz`、球种颜色、敌人 4 态颜色、高亮提示色。
+   - 包含：受击闪烁频率 `enemyFlashHz`、球种颜色、敌人 4 态颜色、高亮提示色。
 
 ---
 
@@ -200,11 +200,8 @@ public TileBase ResolveTile(TileStateType state)
 
 ### 五、落地执行动作与排期
 
-既然要“一锤定音”，这一步的修改将分两动完成：
+**第 1 动已完成**：`projectile` 的 4 列物理参数、`tile_state` 的 `icon`/`willSpread` 列、`enemy` 的 `flash_hz`/`stun_seconds` 列都已在 Excel 剔除，Luban 已按新定义导出。
 
-1. **第 1 动（表格轻量瘦身与 Luban 生成）**：
-   - 在 Excel 中剔除 `projectile` 的 4 列物理参数、`tile_state` 的 `icon`/`willSpread` 列、`enemy` 的 `flash_hz`/`stun_seconds` 列。
-   - 跑一次 Luban 导表，使数据定义真正干净。
-2. **第 2 动（代码 Spec 适配）**：
-   - 修改 `ProjectileSpec.cs`、`PlayerSpec.cs`、`EnemySpec.cs`，将其移出的字段重定向至对应的 Tuning SO。
-   - 改造 `TilemapAdapter.cs`，接入 `AssetModule.Load<TileBase>` 按需加载。
+**第 2 动已完成**：`ProjectileSpec.cs` / `PlayerSpec.cs` / `EnemySpec.cs` 已把移出的字段重定向至对应的 Tuning SO；`TilemapAdapter.cs` 已接入 `AssetModule.Load<TileBase>` 按需加载。
+
+**仍未做的一件**：`player` 表的 `knockback_impulse` / `knockback_speed_limit` / `contact_radius` / `retry_delay` **还在表里且由表消费**，没有移出到 `PlayerConfig.asset`（`PlayerConfig.cs` 里没有这四个字段）；同表的 `contact_damage` 已是零消费者。要搬就按本文件第一节的划界原则走，并同步改 `PlayerSpec` 的重定向——记在 `Docs/待办.md`。

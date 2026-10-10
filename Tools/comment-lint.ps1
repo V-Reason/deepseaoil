@@ -426,7 +426,7 @@ if ($orphans.Count) {
 if ($violations.Count -gt 0) {
     Write-Host ("`n违规 {0} 条：" -f $violations.Count) -ForegroundColor Red
     $violations | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
-    Write-Host "`n规范见 Docs/注释规范.md" -ForegroundColor Red
+    Write-Host "`n规范见 Docs/工程/注释规范.md" -ForegroundColor Red
     exit 1
 }
 

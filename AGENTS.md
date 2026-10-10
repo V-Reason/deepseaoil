@@ -67,8 +67,8 @@ Unity asmdef 引用**不传递**！若在 A 层使用了 B 层公开的类型，
 1. **Excel 表格 (`ConfigWorkspace/Data/*.xlsx`)**：
    - 归策划管辖：只放核心结算数值（HP/伤害）、元素反应网、地块生效节奏、波次编排。
    - 严禁放置物理加速度、击退衰减、手感曲线、闪白频率及美术文件路径。
-   - 现状参照：`enemy` 表已按此瘦身到 **`id` / `name` / `max_speed` / `hp`**（见 `Docs/表格数据配置/最新表格与SO规范.md`）。
-   - 🔴 **唯一配置真源，人工在 Excel 里维护**：枚举列统一填中文**别名**（`基础火池` / `纯水` / `火种子`），并挂数据验证下拉框。
+   - 现状参照：`enemy` 表列 = **`id` / `name` / `max_speed` / `hp` / `contact_damage`**（见 `Docs/配表/最新表格与SO规范.md`）。
+   - 🔴 **唯一配置真源，人工在 Excel 里维护**：`element_rule` / `element_duo_reaction` 的枚举列已用中文**别名**（挂了数据验证下拉框）；`tile_state.id` / `seed.spawn_tile` 仍是数字、`projectile.id` / `seed.id` / `wave.grant_seed` 仍是英文项名 —— 统一到别名是待办收尾（见 `Docs/待办.md`）。
    - 🔴 **严禁编写或运行任何覆盖源表的生成脚本**（重写脚本已物理删除）；那会静默抹掉人工填的别名与下拉框。
    - 改表前必须阅读 `ConfigWorkspace/AGENTS.md`，导表走 `Luban ▸ 表格数据导入` 并执行校验与镜像发布。
 2. **调参 SO (`Assets/Scripts/Data/Settings/*.cs` & `Resources/tuning/`)**：
@@ -113,7 +113,7 @@ Unity asmdef 引用**不传递**！若在 A 层使用了 B 层公开的类型，
 
 ## 7. 注释纪律 (Comment Discipline)
 
-> 完整规范：`Docs/注释规范.md`。机器判据：`pwsh Tools/comment-lint.ps1`（退出码 0 = 通过）。
+> 完整规范：`Docs/工程/注释规范.md`。机器判据：`pwsh Tools/comment-lint.ps1`（退出码 0 = 通过）。
 
 注释是本工程唯一**没有编译期兜底**的产物——写多了不会编译失败、不会测试变红。
 于是它必然单调膨胀：实测 `e2f08be` 之后若干轮开发，代码只长了 8%，注释字符长了 **29%**（53,893 → 69,704）。
@@ -141,7 +141,7 @@ Unity asmdef 引用**不传递**！若在 A 层使用了 B 层公开的类型，
 ## 8. Agent 执行改动工作流 (DoD Checklist)
 
 当你接受任务并准备交付代码时，必须按顺序自检：
-- [ ] 1. 物理目录与命名空间严格对齐（见 `Docs/目录说明.md`）。
+- [ ] 1. 物理目录与命名空间严格对齐（见 `Docs/工程/目录说明.md`）。
 - [ ] 2. 任何需要使用的跨层类型，其基类与接口程序集已在 asmdef 的 `references` 中**显式写全**。
 - [ ] 3. 没有触碰任何生成物禁区。
 - [ ] 4. 热路径无堆内存分配（0 GC）。
