@@ -410,8 +410,7 @@ function New-LeftoverProject {
 
 # 预定义程序集 = Assets 下**所有**没被 asmdef 覆盖的 .cs —— Unity 的规则就是这条，不是枚举目录。
 # 路径里含名为 Editor 的目录 → Assembly-CSharp-Editor，其余 → Assembly-CSharp。
-# 顺带补掉旧脚本的一个盲区：TestTimer.cs 在 Assets/Tests 根下，原来两份硬编码 glob 都没覆盖它，
-# 于是它从来没进过编译门。
+# 覆盖 Assets 下**每一条路径**，不依赖硬编码目录清单：asmdef 之外任何一层深处的残留都会被数出来。
 $leftoverAll = @(Get-ChildItem (Join-Path $root 'Assets') -Recurse -File -Filter *.cs |
         Where-Object { -not $owner.ContainsKey($_.FullName) } |
         ForEach-Object { $_.FullName } | Sort-Object)

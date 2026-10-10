@@ -68,7 +68,9 @@ Unity asmdef 引用**不传递**！若在 A 层使用了 B 层公开的类型，
    - 归策划管辖：只放核心结算数值（HP/伤害）、元素反应网、地块生效节奏、波次编排。
    - 严禁放置物理加速度、击退衰减、手感曲线、闪白频率及美术文件路径。
    - 现状参照：`enemy` 表已按此瘦身到 **`id` / `name` / `max_speed` / `hp`**（见 `Docs/表格数据配置/最新表格与SO规范.md`）。
-   - 改表前必须阅读 `ConfigWorkspace/AGENTS.md`，执行校验并走镜像发布。
+   - 🔴 **唯一配置真源，人工在 Excel 里维护**：枚举列统一填中文**别名**（`基础火池` / `纯水` / `火种子`），并挂数据验证下拉框。
+   - 🔴 **严禁编写或运行任何覆盖源表的生成脚本**（重写脚本已物理删除）；那会静默抹掉人工填的别名与下拉框。
+   - 改表前必须阅读 `ConfigWorkspace/AGENTS.md`，导表走 `Luban ▸ 表格数据导入` 并执行校验与镜像发布。
 2. **调参 SO (`Assets/Scripts/Data/Settings/*.cs` & `Resources/tuning/`)**：
    - 归程序管辖：玩家/敌人运动学参数（`CharacterConfig` / `PlayerConfig` / `EnemyTuning`）、投掷抛物线手感（`ThrowTuning`）、掉落物手感（`DropTuning`）、颜色与视觉频率（`VisualPalette`）。
    - 编辑器内实时生效，无需反复导表；**表里删掉的边缘数值必须落到这里，不能留在代码常量里**（`EnemyTuning` 承接的正是 `enemy` 表的 `radius` / `acceleration` / `knockback_decay` / `stop_distance` / `chase_range`）。
