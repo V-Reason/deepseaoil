@@ -180,35 +180,57 @@ namespace DeepseaOil.Logic.Grid
             return false;
         }
 
-        /// <summary>落地冲击的唯一出口：伤害 → 击退 → 麻痹 → 连锁，顺序固定</summary>
+        /// <summary>落地冲击的唯一出口：支持单格与广域 AoE 波及</summary>
         public bool ApplyImpact(Vector3Int cell, in ReactionOutcome outcome)
         {
             bool any = false;
 
-            if (outcome.InstantDamage > 0)
+            // 范围判定：半径 > 1.0 格时走广域冲击（覆盖九宫格敌人，并自动广播波及事件与匹配特效）
+            if (outcome.ImpactRadius > 1.0f)
             {
-                DealCell(cell, outcome.InstantDamage);
-                any = true;
-            }
+                if (outcome.InstantDamage > 0 || outcome.KnockbackCells > 0f)
+                {
+                    ApplyBlast(cell, outcome.ImpactRadius, outcome.InstantDamage, outcome.KnockbackCells);
+                    any = true;
+                }
 
-            if (outcome.KnockbackCells > 0f)
-            {
-                ApplyKnockback(cell, outcome.KnockbackCells);
-                any = true;
+                if (outcome.StunSeconds > 0f)
+                {
+                    ApplyStunCell(cell, outcome.StunSeconds);
+                    any = true;
+                }
             }
-
-            if (outcome.StunSeconds > 0f)
+            else // 单格判定：<= 1.0 格走原版精准单格
             {
-                ApplyStunCell(cell, outcome.StunSeconds);
-                any = true;
+                if (outcome.InstantDamage > 0)
+                {
+                    DealCell(cell, outcome.InstantDamage);
+                    any = true;
+                }
+
+                if (outcome.KnockbackCells > 0f)
+                {
+                    ApplyKnockback(cell, outcome.KnockbackCells);
+                    any = true;
+                }
+
+                if (outcome.StunSeconds > 0f)
+                {
+                    ApplyStunCell(cell, outcome.StunSeconds);
+                    any = true;
+                }
+
+                // 单格蒸汽生成时广播 1 格基准特效
+                if (outcome.NextTile == TileStateType.Steam)
+                {
+                    EventBus<GridBlastOccurred>.Publish(new GridBlastOccurred(_geometry.CellCenter(cell), _geometry.CellSize, outcome.NextTile));
+                }
             }
 
             if (outcome.TriggerChain)
             {
                 ScheduleTick(cell);
-
                 TileChainReactor.Trigger(this, cell, outcome.NextTile);
-
                 any = true;
             }
 
@@ -318,6 +340,10 @@ namespace DeepseaOil.Logic.Grid
 
                 if (knockbackCells > 0f) ApplyKnockback(cell, knockbackCells);
             }
+
+            // 二级反应激发广域冲击时广播事实
+            TileStateType centerState = StateOf(center);
+            EventBus<GridBlastOccurred>.Publish(new GridBlastOccurred(centerPoint, radiusCells * _geometry.CellSize, centerState));
         }
 
         /// <summary>切换某格状态；同状态 no-op，未登记的格与无表行的状态一律拒绝</summary>

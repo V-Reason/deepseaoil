@@ -17,7 +17,8 @@ namespace DeepseaOil.Presentation.Effects
 
         Shatter,
 
-        /// <summary>持续性高亮，跟逻辑层发布的那一格走，可更新可停止；颜色由消费者给=Tint；持续效果口入口=Update，每帧 Play=每帧新建实例</summary>
         Highlight,
+
+        SteamBlast,
     }
 }

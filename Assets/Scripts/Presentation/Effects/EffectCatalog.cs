@@ -57,12 +57,14 @@ namespace DeepseaOil.Presentation.Effects
         private static readonly EffectSpec[] Specs =
         {
             new EffectSpec(EffectId.BurstSparks,  EffectDriverKind.Particle, isSingleton: false, maxSize: 32, prewarm: 8),
+
             new EffectSpec(EffectId.MudSplash, EffectDriverKind.Particle, isSingleton: false, maxSize: 16, prewarm: 4),
 
             new EffectSpec(EffectId.Shatter,  EffectDriverKind.Shatter,  maxSize: 16, prewarm: 0),
 
-            // 瞄准高亮（持续型）：Create 一次只 Update，始终单实例，池上限 1、不预热
             new EffectSpec(EffectId.Highlight, EffectDriverKind.Highlight, isSingleton: true, maxSize: 1, prewarm: 0),
+
+            new EffectSpec(EffectId.SteamBlast,EffectDriverKind.Particle,isSingleton: false, maxSize: 16, prewarm:4)
         };
 
         internal static IReadOnlyList<EffectSpec> All => Specs;

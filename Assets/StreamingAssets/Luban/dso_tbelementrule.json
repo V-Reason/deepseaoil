@@ -7,6 +7,7 @@
     "impact_damage": 0,
     "impact_knockback": 0,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   },
   {
@@ -17,6 +18,7 @@
     "impact_damage": 0,
     "impact_knockback": 0,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   },
   {
@@ -27,6 +29,7 @@
     "impact_damage": 0,
     "impact_knockback": 2,
     "impact_stun": 0,
+    "impact_radius": 1.5,
     "trigger_chain": false
   },
   {
@@ -37,6 +40,7 @@
     "impact_damage": 2,
     "impact_knockback": 3,
     "impact_stun": 0,
+    "impact_radius": 1.5,
     "trigger_chain": false
   },
   {
@@ -47,6 +51,7 @@
     "impact_damage": 0,
     "impact_knockback": 1,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   },
   {
@@ -57,6 +62,7 @@
     "impact_damage": 1,
     "impact_knockback": 0,
     "impact_stun": 1.5,
+    "impact_radius": 1,
     "trigger_chain": true
   },
   {
@@ -67,6 +73,7 @@
     "impact_damage": 0,
     "impact_knockback": 3,
     "impact_stun": 0,
+    "impact_radius": 1.5,
     "trigger_chain": false
   },
   {
@@ -77,6 +84,7 @@
     "impact_damage": 0,
     "impact_knockback": 0,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   },
   {
@@ -87,6 +95,7 @@
     "impact_damage": 0,
     "impact_knockback": 1,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   },
   {
@@ -97,6 +106,7 @@
     "impact_damage": 0,
     "impact_knockback": 0,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   },
   {
@@ -107,6 +117,7 @@
     "impact_damage": 0,
     "impact_knockback": 0,
     "impact_stun": 0,
+    "impact_radius": 1,
     "trigger_chain": false
   }
 ]

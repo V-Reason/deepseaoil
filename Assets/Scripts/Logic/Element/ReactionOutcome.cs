@@ -7,7 +7,6 @@ namespace DeepseaOil.Logic.Element
     {
         public readonly TileStateType NextTile;
 
-        /// <summary>落地瞬间伤害，当帧结算</summary>
         public readonly int InstantDamage;
 
         public readonly float KnockbackCells;
@@ -16,22 +15,26 @@ namespace DeepseaOil.Logic.Element
 
         public readonly bool TriggerChain;
 
+        public readonly float ImpactRadius;
+
         public ReactionOutcome(
-            TileStateType nextTile,
-            int instantDamage,
-            float knockbackCells,
-            float stunSeconds,
-            bool triggerChain)
+                    TileStateType nextTile,
+                    int instantDamage,
+                    float knockbackCells,
+                    float stunSeconds,
+                    bool triggerChain,
+                    float impactRadius = 1.0f) // 默认 1.0
         {
             NextTile = nextTile;
             InstantDamage = instantDamage;
             KnockbackCells = knockbackCells;
             StunSeconds = stunSeconds;
             TriggerChain = triggerChain;
+            ImpactRadius = impactRadius > 0f ? impactRadius : 1.0f;
         }
 
         /// <summary>不改地形、不打任何冲击</summary>
         public static ReactionOutcome Unchanged(TileStateType current)
-            => new ReactionOutcome(current, 0, 0f, 0f, false);
+            => new ReactionOutcome(current, 0, 0f, 0f, false, 1.0f);
     }
 }

@@ -57,11 +57,12 @@ namespace DeepseaOil.Logic.Element
             if (_rules != null && _rules.TryGetValue((currentTile, ball), out ElementRuleSpec rule))
             {
                 var outcome = new ReactionOutcome(
-                    rule.ResultTile,
-                    rule.ImpactDamage,
-                    rule.ImpactKnockback,
-                    rule.ImpactStun,
-                    rule.TriggerChain);
+                rule.ResultTile,
+                rule.ImpactDamage,
+                rule.ImpactKnockback,
+                rule.ImpactStun,
+                rule.TriggerChain,
+                rule.ImpactRadius);
 
                 LogTrace(currentTile, ball, rule);
 
@@ -83,10 +84,10 @@ namespace DeepseaOil.Logic.Element
             switch (ball)
             {
                 case BallType.Water:
-                    return new ReactionOutcome(TileStateType.BasicWater, 0, 0f, 0f, false);
+                    return new ReactionOutcome(TileStateType.BasicWater, 0, 0f, 0f, false, 1.0f);
 
                 case BallType.Earth:
-                    return new ReactionOutcome(TileStateType.BasicEarth, 0, 0f, 0f, false);
+                    return new ReactionOutcome(TileStateType.BasicEarth, 0, 0f, 0f, false, 1.0f);
 
                 default:
                     return ReactionOutcome.Unchanged(currentTile);

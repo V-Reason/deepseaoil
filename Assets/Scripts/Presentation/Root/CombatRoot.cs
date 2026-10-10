@@ -106,12 +106,14 @@ namespace DeepseaOil.Presentation
         {
             EventBus<DropCollected>.Subscribe(OnDropCollected);
             EventBus<RequestHudRefresh>.Subscribe(OnRequestHudRefresh);
+            EventBus<GridBlastOccurred>.Subscribe(OnGridBlastOccurred);
         }
 
         private void OnDisable()
         {
             EventBus<DropCollected>.Unsubscribe(OnDropCollected);
             EventBus<RequestHudRefresh>.Unsubscribe(OnRequestHudRefresh);
+            EventBus<GridBlastOccurred>.Unsubscribe(OnGridBlastOccurred);
         }
 
         public void RenderTick(float deltaTime)
@@ -531,6 +533,19 @@ namespace DeepseaOil.Presentation
         {
             player?.Logic?.Stats.Announce();
             _combat?.Announce();
+        }
+
+        private void OnGridBlastOccurred(GridBlastOccurred evt)
+        {
+            // 仅对蒸汽地貌或等离子爆轰播放蒸汽扩散特效
+            if (evt.ResultTile != TileStateType.Steam) return;
+
+            EffectContext ctx = EffectContext.At(evt.Center);
+            ctx.Radius = evt.Radius;
+            ctx.Scale = evt.Radius; // ParticleDriver 会将预制体缩放与 Scale 相乘，使扩散范围与半径对齐
+            ctx.Tint = new Color(0.92f, 0.96f, 1f, 0.85f);
+
+            EffectModule.Play(EffectId.SteamBlast, in ctx);
         }
     }
 }

@@ -144,4 +144,21 @@ namespace DeepseaOil.Logic.Events
             SecondsLeft = secondsLeft;
         }
     }
+
+    /// <summary>网格广域冲击/蒸汽扩散事实，中心为格心世界坐标</summary>
+    public readonly struct GridBlastOccurred
+    {
+        public readonly Vector2 Center;
+
+        public readonly float Radius;
+
+        public readonly TileStateType ResultTile;
+
+        public GridBlastOccurred(Vector2 center, float radius, TileStateType resultTile)
+        {
+            Center = center;
+            Radius = radius;
+            ResultTile = resultTile;
+        }
+    }
 }

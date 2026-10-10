@@ -27,6 +27,7 @@ public sealed partial class ElementRule : Luban.BeanBase
         { if(!_buf["impact_damage"].IsNumber) { throw new SerializationException(); }  ImpactDamage = _buf["impact_damage"]; }
         { if(!_buf["impact_knockback"].IsNumber) { throw new SerializationException(); }  ImpactKnockback = _buf["impact_knockback"]; }
         { if(!_buf["impact_stun"].IsNumber) { throw new SerializationException(); }  ImpactStun = _buf["impact_stun"]; }
+        { if(!_buf["impact_radius"].IsNumber) { throw new SerializationException(); }  ImpactRadius = _buf["impact_radius"]; }
         { if(!_buf["trigger_chain"].IsBoolean) { throw new SerializationException(); }  TriggerChain = _buf["trigger_chain"]; }
     }
 
@@ -64,6 +65,10 @@ public sealed partial class ElementRule : Luban.BeanBase
     /// </summary>
     public readonly float ImpactStun;
     /// <summary>
+    /// 波及范围(格)
+    /// </summary>
+    public readonly float ImpactRadius;
+    /// <summary>
     /// 触发网格连锁
     /// </summary>
     public readonly bool TriggerChain;
@@ -85,6 +90,7 @@ public sealed partial class ElementRule : Luban.BeanBase
         + "impactDamage:" + ImpactDamage + ","
         + "impactKnockback:" + ImpactKnockback + ","
         + "impactStun:" + ImpactStun + ","
+        + "impactRadius:" + ImpactRadius + ","
         + "triggerChain:" + TriggerChain + ","
         + "}";
     }
