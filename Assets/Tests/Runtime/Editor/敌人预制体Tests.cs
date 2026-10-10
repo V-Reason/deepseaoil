@@ -148,5 +148,17 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(1, probe.Calls, "每个物理帧必须问且只问一次大脑");
             Assert.AreEqual(probe.Last.Speed, logic.Intent.Speed, 1e-4f, "意图必须原样落到 EnemyLogic.Intent（状态层读的是它）");
         }
+
+        [Test]
+        public void P7_站桩大脑无视目标恒空意图()
+        {
+            IEnemyBrain brain = EnemyBrainFactory.CreateStand();
+
+            Assert.IsTrue(brain is StandBrain, "打靶木桩必须拿到 StandBrain，不能被 spec 换回追逐");
+
+            EnemyIntent intent = brain.Decide(new EnemyBrainContext(Vector2.zero, new Vector2(0.5f, 0f), true));
+
+            Assert.IsTrue(intent.IsIdle, "玩家贴脸也要吐空意图：木桩原地站桩，永不追击");
+        }
     }
 }

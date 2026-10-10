@@ -19,7 +19,6 @@ namespace DeepseaOil.Presentation.Visual
 
         public const int ShatterPiece = 1200;
 
-        /// <summary>0=Default</summary>
         public const int OverlayLayer = 0;
 
         public static int ActorOrder(float y)

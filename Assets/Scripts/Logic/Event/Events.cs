@@ -7,7 +7,6 @@ using cfg.dso;
 
 namespace DeepseaOil.Logic.Events
 {
-    // Intent
     public readonly struct RequestPause { }
 
     public readonly struct RequestResume { }
@@ -25,7 +24,6 @@ namespace DeepseaOil.Logic.Events
 
     public readonly struct GameResumed { }
 
-    // 某一格状态变了，表现层据此换贴图
     public readonly struct TileStateChanged
     {
         public readonly Vector3Int Cell;
@@ -56,7 +54,6 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    // 掉落物被领取了的事实，数量在载荷里不在订阅方
     public readonly struct DropCollected
     {
         public readonly DropType Type;
@@ -106,7 +103,7 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    // 波次或存活数变了；WaveIndex 从 1 起
+    // WaveIndex 从 1 起
     public readonly struct WaveChanged
     {
         public readonly int WaveIndex;
@@ -145,7 +142,7 @@ namespace DeepseaOil.Logic.Events
         }
     }
 
-    /// <summary>网格广域冲击/蒸汽扩散事实，中心为格心世界坐标</summary>
+    /// <summary>中心为格心世界坐标</summary>
     public readonly struct GridBlastOccurred
     {
         public readonly Vector2 Center;

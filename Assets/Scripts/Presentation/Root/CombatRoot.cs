@@ -18,13 +18,13 @@ using DeepseaOil.Presentation.Input;
 using DeepseaOil.Presentation.Visual;
 using DeepseaOil.Presentation.World;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using cfg.dso;
 
 namespace DeepseaOil.Presentation
 {
     /// 战斗切片的组合根：装配一次，每帧驱动
-    // 无 Update/FixedUpdate：GameRoot 调 RenderTick 与 FixedTick
-    // 渲染帧=格子→球→落物→喷泉，物理帧=冲量→敌人→玩家受击
+    // 无 Update；渲染帧=格子→球→落物→喷泉，物理帧=冲量→敌人→波次→玩家受击
     public sealed class CombatRoot : MonoBehaviour, ISceneRoot, IRenderTicked, IPhysicsTicked, IThrowSink
     {
         /// 世界侧排在玩家侧之后
@@ -66,14 +66,18 @@ namespace DeepseaOil.Presentation
         private CombatDirector _combat;
         private TileHighlightView _highlight;
 
-        // 生命神泉的静止累计，随场景重建
         private LifeFountainState _lifeFountain;
 
         private Fountain _lifeFountainSource;
 
         private readonly List<Vector3Int> _contactCells = new List<Vector3Int>(9);
 
+        private readonly List<EnemyActor> _enemies = new List<EnemyActor>();
+
         private float _retryAt = float.PositiveInfinity;
+
+        /// 场景作用域注册点（非 DontDestroyOnLoad 单例）：供运行时拖入的木桩自我报到
+        public static CombatRoot Current { get; private set; }
 
         public bool IsReady { get; private set; }
 
@@ -104,6 +108,8 @@ namespace DeepseaOil.Presentation
 
         private void OnEnable()
         {
+            Current = this;
+
             EventBus<DropCollected>.Subscribe(OnDropCollected);
             EventBus<RequestHudRefresh>.Subscribe(OnRequestHudRefresh);
             EventBus<GridBlastOccurred>.Subscribe(OnGridBlastOccurred);
@@ -111,6 +117,8 @@ namespace DeepseaOil.Presentation
 
         private void OnDisable()
         {
+            if (ReferenceEquals(Current, this)) Current = null;
+
             EventBus<DropCollected>.Unsubscribe(OnDropCollected);
             EventBus<RequestHudRefresh>.Unsubscribe(OnRequestHudRefresh);
             EventBus<GridBlastOccurred>.Unsubscribe(OnGridBlastOccurred);
@@ -120,7 +128,6 @@ namespace DeepseaOil.Presentation
         {
             if (!IsReady) return;
 
-            // 顺序：格子先跑（泥浆可能本帧到期），再推球与落物，最后喷泉
             _grid.Tick(Time.time, deltaTime);
 
             _balls.Tick(deltaTime);
@@ -148,7 +155,21 @@ namespace DeepseaOil.Presentation
             // ① 落地冲量：必须在物理帧施加，渲染帧施加会漂
             _impulses.FixedTick();
 
-            // ② 敌人先按本帧位置追一步，再让格子按新位置结算（顺序不能反）
+            // ② 全场敌人先按本帧位置追一步，再让格子按新位置结算（顺序不能反）
+            for (int i = _enemies.Count - 1; i >= 0; i--)
+            {
+                EnemyActor enemy = _enemies[i];
+                if (enemy == null)
+                {
+                    _enemies.RemoveAt(i);
+                    continue;
+                }
+                if (enemy.IsAlive)
+                {
+                    enemy.FixedTick(now, deltaTime);
+                }
+            }
+
             if (_combat != null) _combat.FixedTick(now, deltaTime);
 
             // ③ 玩家受击：读物理体位置，须在敌人移动之后
@@ -186,7 +207,6 @@ namespace DeepseaOil.Presentation
             EffectModule.Play(EffectId.Highlight, in ctx);
         }
 
-        // 生命神泉：九宫格内完全静止达阈值即回血
         // 三重静止判据（无输入＋速度近零＋位移近零）由驱动方给定
         private void TickLifeFountain(float deltaTime)
         {
@@ -215,7 +235,6 @@ namespace DeepseaOil.Presentation
             logic.Stats.TryHeal();
         }
 
-        // 世界侧两件玩家相关裁决：谁打到玩家、打空怎么重来
         // 判定是纯函数（ContactProbe.TryFindAttacker），可在 EditMode 测
         private void UpdatePlayerContact(float now)
         {
@@ -277,19 +296,81 @@ namespace DeepseaOil.Presentation
         {
             if (_combat != null) _combat.ClearAll();
 
-            // 球也要清，否则玩家复活后会被上一局的球砸出一片泥
+            // 球也要清，否则复活后会被上一局的球砸出一片泥
             _balls?.ClearAll();
 
-            // 掉落物同理：上一局没捡完的水球不该留到下一局
             _drops?.ClearAll();
 
             TileChainReactor.Clear();
 
             overlayDirector?.ClearAll();
+
+            // 权属分流：场景木桩满血归位（物体留着），波次怪彻底销毁
+            for (int i = _enemies.Count - 1; i >= 0; i--)
+            {
+                EnemyActor enemy = _enemies[i];
+
+                if (enemy == null)
+                {
+                    _enemies.RemoveAt(i);
+                    continue;
+                }
+
+                if (enemy.IsScenePlaced)
+                {
+                    enemy.ResetToSpawn();
+                    continue;
+                }
+
+                Destroy(enemy.gameObject);
+
+                _enemies.RemoveAt(i);
+            }
         }
 
-        // 裁决投掷请求（IThrowSink）：落点合法性属世界信息
-        // 唯一否决判据：落点格没有地板（GridLogic.HasCell）；将来的阻挡/占位物加在这里，玩家侧不用改
+        /// 场景木桩入口：吃自身 Inspector 的打靶配置
+        public void AdoptSceneEnemy(EnemyActor actor)
+        {
+            // 世界未接线就丢弃：Start 可能早于 Assemble
+            if (actor == null || actor.IsInitialized || player == null || _grid == null) return;
+
+            EnemySpec spec = ConfigModule.GetEnemy();
+
+            actor.IsScenePlaced = true;
+
+            actor.Initialize(
+                actor.Position,
+                in spec,
+                player.transform,
+                Vector2.right,
+                _grid,
+                _registry,
+                actor.transform.parent != null ? actor.transform.parent : actorRoot);
+
+            Track(actor);
+        }
+
+        /// 波次怪入口：强制 Chase + 不复活，预制体被误存也毒不到波次
+        public void AdoptWaveEnemy(EnemyActor actor, Vector2 position, in EnemySpec spec, Vector2 facing)
+        {
+            if (actor == null) return;
+
+            actor.IsScenePlaced = false;
+
+            actor.Initialize(position, in spec, player.transform, facing, _grid, _registry, actorRoot);
+
+            Track(actor);
+        }
+
+        private void Track(EnemyActor enemy)
+        {
+            if (enemy != null && !_enemies.Contains(enemy))
+            {
+                _enemies.Add(enemy);
+            }
+        }
+
+        // 唯一否决判据：落点格没有地板；将来的阻挡/占位物加在这里，玩家侧不用改
         public bool RequestThrow(in ThrowIntent intent)
         {
             if (!IsReady) return false;
@@ -378,6 +459,8 @@ namespace DeepseaOil.Presentation
 
             AttachFountains();
 
+            AssembleSceneEnemies();
+
             player.Logic.ConfigureAim(in geometry, playerSpec.MaxThrowDistance, this);
 
             if (enableWaves)
@@ -412,7 +495,6 @@ namespace DeepseaOil.Presentation
             overlayDirector.Attach();
         }
 
-        // 泉眼接线：弹药泉挂落物产出
         private void AttachFountains()
         {
             for (int i = 0; i < fountains.Length; i++)
@@ -472,11 +554,10 @@ namespace DeepseaOil.Presentation
             var director = go.AddComponent<CombatDirector>();
 
             director.Initialize(
+                this,
                 player,
                 ConfigModule.GetWaves(),
                 ConfigModule.GetEnemy(),
-                _grid,
-                _registry,
                 actorRoot,
                 OnEnemyKilled);
 
@@ -496,10 +577,8 @@ namespace DeepseaOil.Presentation
             Debug.Log("[Combat] 精英怪被击杀，掉落了 1 颗战备种子。");
         }
 
-        // 精英怪在 enemy 表里的 id
         private const int EliteEnemyId = 2;
 
-        // 掉落物被领取：世界→玩家通知
         // 裁决在这里而不在掉落物里（掉落物只发事实）；加一种掉落物在这里加 case
         private void OnDropCollected(DropCollected evt)
         {
@@ -537,7 +616,6 @@ namespace DeepseaOil.Presentation
 
         private void OnGridBlastOccurred(GridBlastOccurred evt)
         {
-            // 仅对蒸汽地貌或等离子爆轰播放蒸汽扩散特效
             if (evt.ResultTile != TileStateType.Steam) return;
 
             EffectContext ctx = EffectContext.At(evt.Center);
@@ -546,6 +624,34 @@ namespace DeepseaOil.Presentation
             ctx.Tint = new Color(0.92f, 0.96f, 1f, 0.85f);
 
             EffectModule.Play(EffectId.SteamBlast, in ctx);
+        }
+
+        // 装配期扫一次场景预摆怪（运行时拖入的由 EnemyActor.Start 报到）
+        private void AssembleSceneEnemies()
+        {
+            if (actorRoot != null)
+            {
+                AdoptEnemiesIn(actorRoot);
+
+                return;
+            }
+
+            GameObject[] roots = SceneManager.GetActiveScene().GetRootGameObjects();
+
+            for (int i = 0; i < roots.Length; i++)
+            {
+                AdoptEnemiesIn(roots[i].transform);
+            }
+        }
+
+        private void AdoptEnemiesIn(Transform root)
+        {
+            EnemyActor[] actors = root.GetComponentsInChildren<EnemyActor>(true);
+
+            for (int i = 0; i < actors.Length; i++)
+            {
+                AdoptSceneEnemy(actors[i]);
+            }
         }
     }
 }

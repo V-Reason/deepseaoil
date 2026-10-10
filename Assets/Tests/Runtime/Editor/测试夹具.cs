@@ -6,10 +6,6 @@
 //   第二个构造点），而收口后的取值口径是"包装中间类持有生成行引用"。于是"造一行"这件事在测试里
 //   绕不开拼 JSON —— 把它收在这一个文件里，schema 耦合就只有一个落点（改表时改这里）。
 //
-// 【为什么需要 MotorProbe】
-//   速度账本与控制律住在 `ActorLedger`（Logic 层）。本探针把它接到一个纯 C# 的速度字段上，
-//   于是**测试里验的账本与线上跑的是同一份代码**，而 EditMode 不需要造 Rigidbody2D。
-//
 // 【本目录的硬约束】Assets/Tests/Runtime/Editor/ 的末级 `Editor` 保留为目录约定；
 //   真正决定平台的是 DeepseaOil.Tests.EditMode.asmdef 的 includePlatforms: [Editor]。
 // ---------------------------------------------------------------------------
@@ -18,6 +14,7 @@ using DeepseaOil.Data;
 using DeepseaOil.Foundation;
 using DeepseaOil.Logic.Movement;
 using Luban.SimpleJSON;
+using NUnit.Framework;
 using UnityEngine;
 using cfg.dso;
 
@@ -27,17 +24,17 @@ namespace DeepseaOil.Tests
     /// <remarks>每个键都必须出现。缺键时 Luban 的 JSONObject 索引器返回一个惰性占位，它的 IsNumber / IsString 都是 false ⇒ 行的构造会抛 SerializationException（不是留 null）。枚举键写数字，不是成员名。</remarks>
     internal static class RowFactory
     {
-        /// <summary>一行水球：id / 显示名 / 元素类型三列，就是 projectile 表的全部列。</summary>
+        /// <summary>一行水球：id 本身就是球种（BallType），配显示名，只有这两列。</summary>
         /// <remarks>抛物线与投掷距离（flight_duration / max_height / max_*_throw_distance）已从表移交 ThrowTuning SO，用它们请给 ProjectileSpec 传真的调参实例。落地切成什么状态由 element_rule 决定。</remarks>
         public static Projectile WaterRow()
-            => new Projectile(JSON.Parse("{\"id\":0,\"name\":\"纯水\",\"type\":0}"));
+            => new Projectile(JSON.Parse("{\"id\":0,\"name\":\"纯水\"}"));
 
-        /// <summary>一行敌人：显示名"测试敌人"、追击满速 3.6、耐久 3、贴身伤害 1。半径 / 加速度 / 击退衰减 / 停止距离 / 脱战距离已搬进 EnemyTuning 调参 SO。</summary>
+        /// <summary>一行敌人：显示名与数值见下；半径 / 加速度 / 击退衰减 / 停止距离 / 脱战距离已搬进 EnemyTuning 调参 SO。</summary>
         public static Enemy EnemyRow(int id = 1, int hp = 3, int contactDamage = 1)
             => new Enemy(JSON.Parse(
                 $"{{\"id\":{id},\"name\":\"测试敌人\",\"max_speed\":3.6,\"hp\":{hp},\"contact_damage\":{contactDamage}}}"));
 
-        /// <summary>一行玩家：血量 3、贴身伤害 1、无敌 0.8、重试 1.2、攻击间隔 0.35、击退 12/12、接触半径 1、水/土各 5、神泉 3 秒。</summary>
+        /// <summary>一行玩家：字段与默认值见下，受击 / 投掷 / 回血三条链用到的列全在。</summary>
         public static Player PlayerRow()
             => new Player(JSON.Parse(
                 "{\"id\":1,\"name\":\"玩家\",\"max_hp\":3,\"contact_damage\":1," +
@@ -46,7 +43,7 @@ namespace DeepseaOil.Tests
                 "\"water_capacity\":5,\"water_start\":5,\"earth_capacity\":5,\"earth_start\":5," +
                 "\"life_heal_interval\":3}"));
 
-        /// <summary>一行波次：备战 10 / 战斗 30 / 结算 8、6 只、间隔 0.4、出生半径 5、配给火种子。</summary>
+        /// <summary>一行波次：三阶段时长与出生参数见下，配给火种子。</summary>
         public static Wave WaveRow(int id = 1, int enemies = 6, int grantSeed = 1)
             => new Wave(JSON.Parse(
                 $"{{\"id\":{id},\"name\":\"测试波次\",\"prep_time\":10,\"battle_time\":30,\"settle_time\":8," +
@@ -66,7 +63,7 @@ namespace DeepseaOil.Tests
                 $"\"dot_damage\":{dotDamage},\"is_obstacle\":{(isObstacle ? "true" : "false")}," +
                 $"\"is_conductor\":{(isConductor ? "true" : "false")}}}"));
 
-        /// <summary>一行元素反应规则：原格地貌 + 球种 → 结果地貌与落地冲击。</summary>
+        /// <summary>一行元素反应规则：原格地貌 + 球种 → 结果地貌与落地冲击；radius 默认 1 格（只打本格）。</summary>
         public static ElementRule ElementRuleRow(
             int id,
             int sourceTile,
@@ -75,11 +72,13 @@ namespace DeepseaOil.Tests
             int damage = 0,
             float knockback = 0f,
             float stun = 0f,
-            bool triggerChain = false)
+            bool triggerChain = false,
+            float radius = 1f)
             => new ElementRule(JSON.Parse(
                 $"{{\"id\":{id},\"source_tile\":{sourceTile},\"ball_type\":{ballType}," +
                 $"\"result_tile\":{resultTile},\"impact_damage\":{damage},\"impact_knockback\":{knockback}," +
-                $"\"impact_stun\":{stun},\"trigger_chain\":{(triggerChain ? "true" : "false")}}}"));
+                $"\"impact_stun\":{stun},\"impact_radius\":{radius}," +
+                $"\"trigger_chain\":{(triggerChain ? "true" : "false")}}}"));
 
         /// <summary>一行二级元素反应：两个发生器地貌 → 激发的产物与波及。</summary>
         public static ElementDuoReaction DuoRow(
@@ -119,9 +118,10 @@ namespace DeepseaOil.Tests
             int damage = 0,
             float knockback = 0f,
             float stun = 0f,
-            bool triggerChain = false)
+            bool triggerChain = false,
+            float radius = 1f)
             => new ElementRuleSpec(
-                ElementRuleRow(id, sourceTile, ballType, resultTile, damage, knockback, stun, triggerChain));
+                ElementRuleRow(id, sourceTile, ballType, resultTile, damage, knockback, stun, triggerChain, radius));
 
         /// <summary>一条二级元素反应（已包装）。</summary>
         public static DuoReactionSpec DuoSpecOf(
@@ -136,6 +136,24 @@ namespace DeepseaOil.Tests
             bool triggerChain = true)
             => new DuoReactionSpec(
                 DuoRow(id, elemA, elemB, resultTile, damage, knockback, duration, radius, triggerChain));
+    }
+
+    /// <summary>夹具自检：表加了列而这里没跟上时先红，而不是让一堆无关用例一起抛 Luban 反序列化异常</summary>
+    public class 夹具自检Tests
+    {
+        [Test]
+        public void 每个夹具行都合当前表结构()
+        {
+            Assert.DoesNotThrow(() => RowFactory.WaterRow(), "projectile 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.EnemyRow(), "enemy 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.PlayerRow(), "player 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.WaveRow(), "wave 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.TileStateRow(1), "tile_state 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.ElementRuleRow(1, 1, 0, 2), "element_rule 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.DuoRow(1, 2, 3, 8), "element_duo_reaction 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.SeedRow(1, 15), "seed 行没跟上生成 schema");
+            Assert.DoesNotThrow(() => RowFactory.TileInitialRow(0, 0, 1), "tile_initial 行没跟上生成 schema");
+        }
     }
 
     /// <summary>不碰引擎的移动执行器探针：速度只存在一个字段里，账本与控制律复用生产实现</summary>

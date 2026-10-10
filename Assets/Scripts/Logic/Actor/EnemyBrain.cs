@@ -8,7 +8,7 @@ namespace DeepseaOil.Logic
         EnemyIntent Decide(in EnemyBrainContext ctx);
     }
 
-    /// <remarks>无目标走 WithoutTarget，别用 HasTarget=false</remarks>
+    /// <remarks>无目标走 WithoutTarget</remarks>
     public readonly struct EnemyBrainContext
     {
         public readonly Vector2 Self;
@@ -54,11 +54,22 @@ namespace DeepseaOil.Logic
         }
     }
 
+    /// 打靶木桩：恒零速度
+    public sealed class StandBrain : IEnemyBrain
+    {
+        public EnemyIntent Decide(in EnemyBrainContext ctx) => EnemyIntent.Idle;
+    }
+
     public static class EnemyBrainFactory
     {
         public static IEnemyBrain Create(in EnemySpec spec)
         {
             return new ChaseBrain(spec);
+        }
+
+        public static IEnemyBrain CreateStand()
+        {
+            return new StandBrain();
         }
     }
 }

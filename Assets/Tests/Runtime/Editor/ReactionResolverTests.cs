@@ -37,7 +37,7 @@ namespace DeepseaOil.Tests
         [Test]
         public void 表命中时优先于兜底()
         {
-            Init(RowFactory.ElementRuleSpecOf(1, (int)TileStateType.Normal, (int)BallType.Water, (int)TileStateType.Mud, 7, 2f, 1.5f, true));
+            Init(RowFactory.ElementRuleSpecOf(1, (int)TileStateType.Normal, (int)BallType.Water, (int)TileStateType.Mud, 7, 2f, 1.5f, true, radius: 2f));
 
             ReactionOutcome outcome = ReactionResolver.Resolve(TileStateType.Normal, BallType.Water);
 
@@ -46,6 +46,7 @@ namespace DeepseaOil.Tests
             Assert.AreEqual(7, outcome.InstantDamage);
             Assert.AreEqual(2f, outcome.KnockbackCells, 1e-4f);
             Assert.AreEqual(1.5f, outcome.StunSeconds, 1e-4f);
+            Assert.AreEqual(2f, outcome.ImpactRadius, 1e-4f, "impact_radius 没传到结果：新列漏接在夹具里");
             Assert.IsTrue(outcome.TriggerChain);
         }
 

@@ -1,22 +1,20 @@
 using System.Collections.Generic;
 using DeepseaOil.Data;
 using DeepseaOil.Logic.Events;
-using DeepseaOil.Logic.Grid;
 using DeepseaOil.Logic.Wave;
 using UnityEngine;
 
 namespace DeepseaOil.Presentation.Actor
 {
-    /// <summary>战斗调度：按波次三阶段生成敌人、逐只驱动、清场</summary>
-    /// <remarks>由组合根每物理帧调 FixedTick（不挂 Update）；波次与存活数的唯一权威，HUD 读的 WaveChanged 由此发布；敌人预制体缺件是硬错误，取消生成不做白模兜底。</remarks>
+    /// <summary>战斗调度：按波次三阶段生成敌人与清场</summary>
+    /// <remarks>由组合根每物理帧调 FixedTick（不挂 Update），敌人推进归 CombatRoot，本类只生成与计数；波次与存活数的唯一权威，HUD 读的 WaveChanged 由此发布；敌人预制体缺件是硬错误，取消生成不做白模兜底。</remarks>
     public sealed class CombatDirector : MonoBehaviour
     {
+        private CombatRoot _combatRoot;
         private WaveLogic _logic;
         private EnemySpec _enemySpec;
         private Transform _player;
         private Transform _actorRoot;
-        private GridLogic _grid;
-        private EnemyCellRegistry _registry;
 
         private System.Action<EnemySpec, Vector2> _onKilled;
 
@@ -35,25 +33,23 @@ namespace DeepseaOil.Presentation.Actor
         public Vector2 FirstAliveEnemyVelocity { get; private set; }
 
         public void Initialize(
+            CombatRoot combatRoot,
             PlayerController player,
             IReadOnlyList<WaveSpec> waves,
             EnemySpec enemySpec,
-            GridLogic grid,
-            EnemyCellRegistry registry,
             Transform actorRoot,
             System.Action<EnemySpec, Vector2> onKilled = null)
         {
-            if (player == null || player.Logic == null)
+            if (combatRoot == null || player == null || player.Logic == null)
             {
-                Debug.LogError("CombatDirector 没有玩家引用（或玩家逻辑层没装配好），敌人不会生成，已停用。", this);
+                Debug.LogError("CombatDirector 没有战斗根或玩家引用（或玩家逻辑层没装配好），敌人不会生成，已停用。", this);
                 enabled = false;
                 return;
             }
 
+            _combatRoot = combatRoot;
             _player = player.transform;
             _enemySpec = enemySpec;
-            _grid = grid;
-            _registry = registry;
             _actorRoot = actorRoot;
             _onKilled = onKilled;
             _logic = new WaveLogic(waves);
@@ -63,11 +59,7 @@ namespace DeepseaOil.Presentation.Actor
 
         public void ClearAll()
         {
-            for (int i = 0; i < _enemies.Count; i++)
-            {
-                if (_enemies[i] != null) Destroy(_enemies[i].gameObject);
-            }
-
+            // 销毁权归 CombatRoot 的权属分流（木桩归位、波次怪销毁），本类只清自己的账
             _enemies.Clear();
 
             _logic?.Reset();
@@ -90,15 +82,6 @@ namespace DeepseaOil.Presentation.Actor
             if (_logic == null || _player == null) return;
 
             ClearDestroyed();
-
-            for (int i = 0; i < _enemies.Count; i++)
-            {
-                EnemyActor enemy = _enemies[i];
-
-                if (enemy == null || !enemy.IsAlive) continue;
-
-                enemy.FixedTick(now, deltaTime);
-            }
 
             AliveCount = CountAlive();
             UpdateReadouts();
@@ -137,16 +120,9 @@ namespace DeepseaOil.Presentation.Actor
                 return;
             }
 
-            actor.Initialize(
-                request.Position,
-                in _enemySpec,
-                _player,
-                PlayerPosition() - request.Position,
-                _grid,
-                _registry,
-                _actorRoot);
-
             if (_onKilled != null) actor.Died = OnEnemyDied;
+
+            _combatRoot.AdoptWaveEnemy(actor, request.Position, in _enemySpec, PlayerPosition() - request.Position);
 
             _enemies.Add(actor);
         }
