@@ -50,9 +50,12 @@ namespace DeepseaOil.Presentation
         [Tooltip("是否刷敌人。关掉可以只验投掷链路。")]
         [SerializeField] private bool enableWaves = true;
 
+        [Tooltip("贴图覆盖管理器，留空自愈")]
+        [SerializeField] private TileOverlayDirector overlayDirector = default;
+
         private GameRoot _root;
 
-        private GridLogic _grid;        private EnemyCellRegistry _registry;
+        private GridLogic _grid; private EnemyCellRegistry _registry;
 
         private BallDirector _balls;
 
@@ -93,6 +96,7 @@ namespace DeepseaOil.Presentation
         {
             _highlight?.Detach();
             gridView?.Detach();
+            overlayDirector?.Detach();
 
             // 销毁期再问 GameRoot.Instance 会当场造一个新的，只能用 Start 里抓的引用
             if (_root != null) _root.UnregisterSceneRoot(this);
@@ -278,6 +282,8 @@ namespace DeepseaOil.Presentation
             _drops?.ClearAll();
 
             TileChainReactor.Clear();
+
+            overlayDirector?.ClearAll();
         }
 
         // 裁决投掷请求（IThrowSink）：落点合法性属世界信息
@@ -344,6 +350,8 @@ namespace DeepseaOil.Presentation
             // 先订阅格子状态变化再灌初始状态，否则那批泥浆不会被画出来
             gridView.Attach();
 
+            EnsureOverlayDirector(geometry);
+
             int cells = gridView.RegisterCells(_grid);
 
             // 关卡初始地块优先从场景里的 InitialSetup 笔刷层读（策划在编辑器里画）
@@ -385,6 +393,21 @@ namespace DeepseaOil.Presentation
                     ? $"回血静止 {_lifeFountain.HealInterval} 秒，"
                     : "（未接线生命神泉：本局没有回血站，请在场景里放一个 kind=Life 的 Fountain）") +
                 (enableWaves ? "敌人 启用" : "敌人 关闭（「是否刷敌人」未勾选）"));
+        }
+
+        private void EnsureOverlayDirector(in GridGeometry geometry)
+        {
+            if (overlayDirector == null)
+            {
+                overlayDirector = GetComponent<TileOverlayDirector>();
+                if (overlayDirector == null)
+                {
+                    overlayDirector = gameObject.AddComponent<TileOverlayDirector>();
+                }
+            }
+
+            overlayDirector.Initialize(geometry);
+            overlayDirector.Attach();
         }
 
         // 泉眼接线：弹药泉挂落物产出

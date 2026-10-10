@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: EnemyTuning
   m_EditorClassIdentifier: 
   radius: 0.45
-  acceleration: 14
+  acceleration: 5
   knockbackDecay: 10
   stopDistance: 0.6
   chaseRange: 60

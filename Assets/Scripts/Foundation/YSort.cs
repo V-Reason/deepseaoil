@@ -20,11 +20,11 @@ namespace DeepseaOil.Foundation
 
             int stepped = Mathf.FloorToInt(y * levelsPerUnit + 0.5f);
 
-            int order = bandEnd - stepped;
+            // 中点映射：y=0 对应频带正中心，负 Y 坐标自然向上增长而绝不溢出封顶
+            int midOrder = (bandStart + bandEnd) / 2;
+            int order = midOrder - stepped;
 
-            if (order < bandStart) return bandStart;
-
-            return order > bandEnd ? bandEnd : order;
+            return Mathf.Clamp(order, bandStart, bandEnd);
         }
     }
 }

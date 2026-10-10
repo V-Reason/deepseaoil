@@ -10,11 +10,11 @@ namespace DeepseaOil.Presentation.Visual
         /// <summary>瞄准反馈层（320），压着格效果、被格上角色盖住</summary>
         public const int Aim = 320;
 
-        public const int YSortBandStart = 500;
+        public const int YSortBandStart = 400;
 
-        public const int YSortBandEnd = 559;
+        public const int YSortBandEnd = 1000;
 
-        /// <summary>每世界单位档数，改它须同步 YSort 频带</summary>
+        /// <summary>每世界单位档数，4 档表示每 0.25 米一个独立深度层级</summary>
         public const float YSortLevelsPerUnit = 4f;
 
         public const int ShatterPiece = 1200;

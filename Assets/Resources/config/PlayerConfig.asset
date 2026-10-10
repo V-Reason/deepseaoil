@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: PlayerConfig
   m_EditorClassIdentifier: 
   Name: 
-  moveSpeed: 10
+  moveSpeed: 8
   snapToEightDirections: 1
   moveAcceleration: 60
   turnDecayRate: 20
   hurtDecay: 0
   extraForceScale: 0
-  dashSpeed: 25
+  dashSpeed: 20
   dashDuration: 0.2
   inputBufferTime: 0.12
   dashCooldown: 1.5
